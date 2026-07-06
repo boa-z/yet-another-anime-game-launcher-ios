@@ -47,6 +47,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertLessThan(index(of: "Game is running (simulation)", in: stateTexts), index(of: "Reverting patches", in: stateTexts))
         XCTAssertTrue(logs.contains("launch dir: iOS Sandbox/VirtualGameData/hk4e_cn"))
         XCTAssertTrue(logs.contains("launch: workaround3 skips tagged patch payloads"))
+        XCTAssertTrue(logs.contains("launch: desktop removed-file patch plan moves YuanShen_Data/upload_crash.exe, YuanShen_Data/Plugins/crashreport.exe, YuanShen_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
         XCTAssertTrue(logs.contains("launch: Wine distro Wine 11.0 DXMT (signed, with patches) (11.0-dxmt-signed-with-patches) is simulated only"))
         XCTAssertTrue(logs.contains("launch: HK4E Steam path bypasses config.bat cloud flags"))
         XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
@@ -160,9 +161,12 @@ final class LauncherSimulationServiceTests: XCTestCase {
 
         XCTAssertTrue(hk4eLogs.contains("install: Sophon startInstallation game_type=hk4e install_reltype=cn is simulated"))
         XCTAssertTrue(hk4eLogs.contains("install: real Sophon download is disabled on iOS"))
+        XCTAssertTrue(hk4eLogs.contains("install: desktop server metadata game_version=5.3.0 channel=1 sub_channel=1 cps=<CN_CPS> is represented without running Sophon side effects"))
         XCTAssertTrue(napLogs.contains("install: Aria2 segmented ZIP download to .ariatmp, concatenation, doStreamUnzip, cleanup, and config.ini write are simulated"))
+        XCTAssertTrue(napLogs.contains("install: config.ini [General] game_version=3.0.0 channel=1 sub_channel=0 cps=<NAP_CPS> is simulated"))
         XCTAssertTrue(hkrpgLogs.contains("install: Aria2 segmented 7z download to .ariatmp, doStreamUn7z, cleanup, and config.ini write are simulated"))
         XCTAssertTrue(bh3Logs.contains("install: Aria2 game.7z download to .ariatmp, extract7z, and config.ini write are simulated"))
+        XCTAssertTrue(bh3Logs.contains("install: desktop server metadata game_version=8.4.0 channel=0 sub_channel=0 cps= is retained; BH3 config.ini rewrite is simulated on update"))
         XCTAssertTrue(bh3Logs.contains("install: real Aria2 game archive download is disabled on iOS"))
     }
 
@@ -197,12 +201,14 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(hk4eLogs.contains("update: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=false is simulated"))
         XCTAssertTrue(hk4eLogs.contains("update: Sophon diff/chunk downloads and game package writes are disabled"))
         XCTAssertTrue(hk4eLogs.contains("update: Sophon delete_file, ldiff_download_complete, chunk_progress, and delete_ldiff_file events are simulated"))
+        XCTAssertTrue(hk4eLogs.contains("update: desktop server metadata game_version=5.3.0 channel=1 sub_channel=1 cps=<CN_CPS> is represented without running Sophon side effects"))
         XCTAssertEqual(hk4eCommands.compactMap(\.virtualPatchState), [false])
 
         XCTAssertTrue(hkrpgLogs.contains("update: 4.2.0 -> 4.3.0"))
         XCTAssertTrue(hkrpgLogs.contains("update: Aria2 patch archive download to .ariatmp, extract7z, deletefiles.txt, hdiffmap.json, hpatchz, and audio package patches are simulated"))
         XCTAssertTrue(hkrpgLogs.contains("update: Aria2 patch archive downloads and game package writes are disabled"))
-        XCTAssertTrue(hkrpgLogs.contains("update: extract7z output, deletefiles.txt cleanup, hdiffmap.json patch map, and config.ini rewrite are simulated"))
+        XCTAssertTrue(hkrpgLogs.contains("update: extract7z output, deletefiles.txt cleanup, and hdiffmap.json patch map are simulated"))
+        XCTAssertTrue(hkrpgLogs.contains("update: config.ini [General] game_version=4.3.0 channel=1 sub_channel=1 cps=<HKRPG_OS_CPS> is simulated"))
         XCTAssertTrue(hkrpgLogs.contains("update: predownloaded_all and per-archive predownload markers would be cleared"))
     }
 
@@ -302,6 +308,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
 
         XCTAssertTrue(logs.contains("launch: full patch payload set is simulated"))
         XCTAssertTrue(logs.contains("launch: jadeite.exe wraps BH3.exe"))
+        XCTAssertTrue(logs.contains("launch: desktop removed-file patch plan moves BH3_Data/Plugins/crashreport.exe, BH3_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
         XCTAssertTrue(logs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
         XCTAssertTrue(logs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
         XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))

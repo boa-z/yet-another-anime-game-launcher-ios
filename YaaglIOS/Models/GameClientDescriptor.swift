@@ -6,6 +6,7 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
     let shortTitle: String
     let region: String
     let serverID: String
+    let server: GameClientServerMetadata
     let gameType: String
     let releaseType: String
     let productName: String
@@ -21,4 +22,3 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
     let secondaryHex: String
     let launchButtonLocation: LaunchButtonLocation
 }
-

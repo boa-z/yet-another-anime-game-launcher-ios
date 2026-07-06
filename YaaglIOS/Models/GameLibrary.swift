@@ -8,6 +8,20 @@ enum GameLibrary {
             shortTitle: "GI CN",
             region: "CN",
             serverID: "hk4e_cn",
+            server: GameClientServerMetadata(
+                channelID: 1,
+                subchannelID: 1,
+                cpsReference: "CN_CPS",
+                launcherUpdateResourceID: "hk4ecn",
+                desktopDefaultWineDistributionID: "11.0-dxmt-signed-with-patches",
+                blockNetHost: "dispatchcnglobal.yuanshen.com",
+                blockNetDurationSeconds: 10,
+                removedFiles: [
+                    "YuanShen_Data/upload_crash.exe",
+                    "YuanShen_Data/Plugins/crashreport.exe",
+                    "YuanShen_Data/Plugins/vulkan-1.dll"
+                ]
+            ),
             gameType: "hk4e",
             releaseType: "cn",
             productName: "YuanShen",
@@ -29,6 +43,20 @@ enum GameLibrary {
             shortTitle: "GI OS",
             region: "Global",
             serverID: "hk4e_global",
+            server: GameClientServerMetadata(
+                channelID: 1,
+                subchannelID: 0,
+                cpsReference: "OS_CPS",
+                launcherUpdateResourceID: "hk4eos",
+                desktopDefaultWineDistributionID: "11.0-dxmt-signed-with-patches",
+                blockNetHost: "dispatchosglobal.yuanshen.com",
+                blockNetDurationSeconds: 10,
+                removedFiles: [
+                    "GenshinImpact_Data/upload_crash.exe",
+                    "GenshinImpact_Data/Plugins/crashreport.exe",
+                    "GenshinImpact_Data/Plugins/vulkan-1.dll"
+                ]
+            ),
             gameType: "hk4e",
             releaseType: "os",
             productName: "Genshin Impact",
@@ -50,6 +78,16 @@ enum GameLibrary {
             shortTitle: "HSR CN",
             region: "CN",
             serverID: "hkrpg_cn",
+            server: GameClientServerMetadata(
+                channelID: 1,
+                subchannelID: 1,
+                cpsReference: "HKRPG_CN_CPS",
+                launcherUpdateResourceID: "hkrpgcn",
+                desktopDefaultWineDistributionID: "11.0-1-crossover-signed-experimental",
+                blockNetHost: "globaldp-prod-cn01.bhsr.com",
+                blockNetDurationSeconds: 15,
+                removedFiles: []
+            ),
             gameType: "hkrpg",
             releaseType: "cn",
             productName: "Star Rail",
@@ -71,6 +109,16 @@ enum GameLibrary {
             shortTitle: "HSR OS",
             region: "Global",
             serverID: "hkrpg_global",
+            server: GameClientServerMetadata(
+                channelID: 1,
+                subchannelID: 1,
+                cpsReference: "HKRPG_OS_CPS",
+                launcherUpdateResourceID: "hkrpgos",
+                desktopDefaultWineDistributionID: "11.0-1-crossover-signed-experimental",
+                blockNetHost: "globaldp-prod-os01.starrails.com",
+                blockNetDurationSeconds: 15,
+                removedFiles: []
+            ),
             gameType: "hkrpg",
             releaseType: "os",
             productName: "Star Rail",
@@ -92,6 +140,16 @@ enum GameLibrary {
             shortTitle: "ZZZ CN",
             region: "CN",
             serverID: "nap_cn",
+            server: GameClientServerMetadata(
+                channelID: 1,
+                subchannelID: 1,
+                cpsReference: "NAP_CPS",
+                launcherUpdateResourceID: "napcn",
+                desktopDefaultWineDistributionID: "11.0-1-crossover-signed-experimental",
+                blockNetHost: "globaldp-prod-cn02.juequling.com",
+                blockNetDurationSeconds: 20,
+                removedFiles: []
+            ),
             gameType: "nap",
             releaseType: "cn",
             productName: "NAP",
@@ -113,6 +171,16 @@ enum GameLibrary {
             shortTitle: "ZZZ OS",
             region: "Global",
             serverID: "nap_global",
+            server: GameClientServerMetadata(
+                channelID: 1,
+                subchannelID: 0,
+                cpsReference: "NAP_CPS",
+                launcherUpdateResourceID: "napos",
+                desktopDefaultWineDistributionID: "11.0-1-crossover-signed-experimental",
+                blockNetHost: "globaldp-prod-os01.zenlesszonezero.com",
+                blockNetDurationSeconds: 20,
+                removedFiles: []
+            ),
             gameType: "nap",
             releaseType: "os",
             productName: "NAP",
@@ -134,6 +202,19 @@ enum GameLibrary {
             shortTitle: "BH3 OS",
             region: "Global",
             serverID: "bh3_global",
+            server: GameClientServerMetadata(
+                channelID: 0,
+                subchannelID: 0,
+                cpsReference: "",
+                launcherUpdateResourceID: "bh3glb",
+                desktopDefaultWineDistributionID: "unstable-bh-wine-1.1",
+                blockNetHost: nil,
+                blockNetDurationSeconds: nil,
+                removedFiles: [
+                    "BH3_Data/Plugins/crashreport.exe",
+                    "BH3_Data/Plugins/vulkan-1.dll"
+                ]
+            ),
             gameType: "bh3",
             releaseType: "os",
             productName: "BH3",
@@ -151,4 +232,3 @@ enum GameLibrary {
         )
     ]
 }
-

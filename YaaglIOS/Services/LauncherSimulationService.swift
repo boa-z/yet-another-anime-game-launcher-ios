@@ -79,7 +79,8 @@ struct LauncherSimulationService: Sendable {
             SimulationStep("Allocating files on disk", progress: nil, log: "install: target \(installDirectory)"),
             SimulationStep("Preparing desktop install pipeline", progress: 0.12, log: installPipelineLog(for: client)),
             SimulationStep("Blocked game resource download for \(client.shortTitle)", progress: 0.18, log: installDownloadBlockLog(for: client)),
-            SimulationStep("Creating virtual installation record", progress: 0.54, log: "install: config.ini/package version writes are represented by UserDefaults only"),
+            SimulationStep("Writing desktop metadata", progress: 0.42, log: desktopConfigMetadataLog(for: client, version: client.latestVersion, action: "install")),
+            SimulationStep("Creating virtual installation record", progress: 0.62, log: "install: config.ini/package version writes are represented by UserDefaults only"),
             SimulationStep("Saving current version \(client.latestVersion)", progress: 0.86),
             SimulationStep("Install simulation complete", progress: 1.0)
         ]
@@ -114,12 +115,12 @@ struct LauncherSimulationService: Sendable {
             SimulationStep(
                 "Checking YAAGL Updates",
                 progress: nil,
-                log: "launcher update: GitHub latest release lookup for \(launcherUpdateResourceID(for: client)) is simulated"
+                log: "launcher update: GitHub latest release lookup for \(client.server.launcherUpdateResourceID) is simulated"
             ),
             SimulationStep(
                 "Blocked launcher update download",
                 progress: 0.58,
-                log: "launcher update: resources_\(launcherUpdateResourceID(for: client)).neu and optional sidecar tar.gz were not downloaded"
+                log: "launcher update: resources_\(client.server.launcherUpdateResourceID).neu and optional sidecar tar.gz were not downloaded"
             ),
             SimulationStep(
                 "Launcher update simulation complete",
@@ -153,6 +154,29 @@ struct LauncherSimulationService: Sendable {
         }
     }
 
+    private func desktopConfigMetadataLog(
+        for client: GameClientDescriptor,
+        version: String,
+        action: String
+    ) -> String {
+        let metadata = client.server
+        let fields = [
+            "game_version=\(version)",
+            "channel=\(metadata.channelID)",
+            "sub_channel=\(metadata.subchannelID)",
+            "cps=\(metadata.cpsDisplayValue)"
+        ].joined(separator: " ")
+
+        switch client.gameType {
+        case "hk4e":
+            return "\(action): desktop server metadata \(fields) is represented without running Sophon side effects"
+        case "bh3" where action == "install":
+            return "\(action): desktop server metadata \(fields) is retained; BH3 config.ini rewrite is simulated on update"
+        default:
+            return "\(action): config.ini [General] \(fields) is simulated"
+        }
+    }
+
     private func predownloadPipelineLog(for client: GameClientDescriptor) -> String {
         switch client.gameType {
         case "hk4e":
@@ -168,27 +192,6 @@ struct LauncherSimulationService: Sendable {
             "integrity: Sophon startRepair game_type=hk4e repair_mode=reliable is simulated"
         default:
             "integrity: pkg_version scan with size/md5 checks and Aria2 repair downloads is simulated"
-        }
-    }
-
-    private func launcherUpdateResourceID(for client: GameClientDescriptor) -> String {
-        switch client.id {
-        case "hk4e_cn":
-            "hk4ecn"
-        case "hk4e_global":
-            "hk4eos"
-        case "hkrpg_cn":
-            "hkrpgcn"
-        case "hkrpg_global":
-            "hkrpgos"
-        case "nap_cn":
-            "napcn"
-        case "nap_global":
-            "napos"
-        case "bh3_global":
-            "bh3glb"
-        default:
-            client.id
         }
     }
 
@@ -212,7 +215,8 @@ struct LauncherSimulationService: Sendable {
         case .newTarget:
             return [
                 SimulationStep("Preparing new install target", progress: nil),
-                SimulationStep("Blocked game resource download for \(client.shortTitle)", progress: 0.35, log: "install: real Sophon download is disabled on iOS"),
+                SimulationStep("Blocked game resource download for \(client.shortTitle)", progress: 0.35, log: installDownloadBlockLog(for: client)),
+                SimulationStep("Writing desktop metadata", progress: 0.58, log: desktopConfigMetadataLog(for: client, version: client.latestVersion, action: "install")),
                 SimulationStep("Creating virtual installation record", progress: 0.78),
                 SimulationStep("Install simulation complete", progress: 1.0)
             ]
@@ -292,6 +296,14 @@ struct LauncherSimulationService: Sendable {
                 log: "launch: Wine distro \(wineDistroLabel) is simulated only"
             )
         ]
+
+        if let removedFilesLog = removedFilesPatchPlanLog(for: client, configuration: configuration, capabilities: capabilities) {
+            steps.append(SimulationStep(
+                "Simulating removed-file patch plan",
+                progress: 0.14,
+                log: removedFilesLog
+            ))
+        }
 
         steps.append(contentsOf: clientLaunchPlanSteps(
             client: client,
@@ -564,19 +576,13 @@ struct LauncherSimulationService: Sendable {
     }
 
     private func hostsBlockPlan(for client: GameClientDescriptor) -> (host: String, durationSeconds: Int)? {
-        switch client.gameType {
-        case "hk4e":
-            let host = client.releaseType == "cn" ? "dispatchcnglobal.yuanshen.com" : "dispatchosglobal.yuanshen.com"
-            return (host, 10)
-        case "nap":
-            let host = client.releaseType == "cn" ? "globaldp-prod-cn02.juequling.com" : "globaldp-prod-os01.zenlesszonezero.com"
-            return (host, 20)
-        case "hkrpg":
-            let host = client.releaseType == "cn" ? "globaldp-prod-cn01.bhsr.com" : "globaldp-prod-os01.starrails.com"
-            return (host, 15)
-        default:
+        guard let host = client.server.blockNetHost,
+              let durationSeconds = client.server.blockNetDurationSeconds
+        else {
             return nil
         }
+
+        return (host, durationSeconds)
     }
 
     private func registryDword(_ value: Int) -> String {
@@ -601,6 +607,20 @@ struct LauncherSimulationService: Sendable {
         }
     }
 
+    private func removedFilesPatchPlanLog(
+        for client: GameClientDescriptor,
+        configuration: LauncherConfigurationSnapshot,
+        capabilities: GameSettingsCapabilities
+    ) -> String? {
+        guard !(capabilities.patchOff && configuration.patchOff),
+              !client.server.removedFiles.isEmpty
+        else {
+            return nil
+        }
+
+        return "launch: desktop removed-file patch plan moves \(client.server.removedFiles.joined(separator: ", ")) to .bak and restores them after exit"
+    }
+
     private func updateSteps(client: GameClientDescriptor, state: ChannelClientState) -> [SimulationStep] {
         guard client.updatableVersions.contains(state.currentVersion) else {
             return [
@@ -619,9 +639,10 @@ struct LauncherSimulationService: Sendable {
             SimulationStep("Preparing desktop update pipeline", progress: 0.12, log: updatePipelineLog(for: client)),
             SimulationStep("Blocked incremental patch download", progress: 0.22, log: updateDownloadBlockLog(for: client)),
             SimulationStep("Simulating patch application", progress: 0.58, log: updatePatchApplicationLog(for: client)),
+            SimulationStep("Rewriting desktop metadata", progress: 0.72, log: desktopConfigMetadataLog(for: client, version: client.latestVersion, action: "update")),
             SimulationStep(
                 "Clearing pre-download marker",
-                progress: 0.82,
+                progress: 0.84,
                 log: "update: predownloaded_all and per-archive predownload markers would be cleared",
                 virtualPatchState: false
             ),
@@ -658,9 +679,9 @@ struct LauncherSimulationService: Sendable {
         case "hk4e":
             "update: Sophon delete_file, ldiff_download_complete, chunk_progress, and delete_ldiff_file events are simulated"
         case "hkrpg":
-            "update: extract7z output, deletefiles.txt cleanup, hdiffmap.json patch map, and config.ini rewrite are simulated"
+            "update: extract7z output, deletefiles.txt cleanup, and hdiffmap.json patch map are simulated"
         default:
-            "update: unzip output, deletefiles.txt cleanup, hdifffiles.txt patch map, and config.ini rewrite are simulated"
+            "update: unzip output, deletefiles.txt cleanup, and hdifffiles.txt patch map are simulated"
         }
     }
 
