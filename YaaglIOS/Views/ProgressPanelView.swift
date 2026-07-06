@@ -9,11 +9,14 @@ struct ProgressPanelView: View {
                 Label("Task", systemImage: "waveform.path.ecg")
                     .font(.headline)
                 Spacer()
-                Text(viewModel.isBusy ? "Busy" : "Idle")
+                Text(viewModel.isBusy || viewModel.isBackgroundBusy ? "Busy" : "Idle")
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(viewModel.isBusy ? .orange.opacity(0.18) : .green.opacity(0.18), in: Capsule())
+                    .background(
+                        viewModel.isBusy || viewModel.isBackgroundBusy ? .orange.opacity(0.18) : .green.opacity(0.18),
+                        in: Capsule()
+                    )
             }
 
             Text(viewModel.statusText)
@@ -30,6 +33,21 @@ struct ProgressPanelView: View {
             } else {
                 Color.clear
                     .frame(height: 20)
+            }
+
+            if viewModel.isBackgroundBusy {
+                Divider()
+
+                Text(viewModel.backgroundStatusText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                if let backgroundProgress = viewModel.backgroundProgress {
+                    ProgressView(value: backgroundProgress)
+                } else {
+                    ProgressView()
+                }
             }
         }
         .padding(16)

@@ -19,6 +19,9 @@ final class LauncherViewModel {
     var currentVersion = "0.0.0"
     var statusText = "Ready"
     var progress: Double?
+    var backgroundStatusText = ""
+    var backgroundProgress: Double?
+    var backgroundTaskStatus: TaskStatus = .idle
     var taskStatus: TaskStatus = .idle
     var showPredownloadPrompt = false
     var taskHistory: [TaskHistoryItem] = []
@@ -27,9 +30,11 @@ final class LauncherViewModel {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let store: ChannelClientStore
     @ObservationIgnored private let taskQueue: LauncherTaskQueue
+    @ObservationIgnored private let backgroundTaskQueue: LauncherTaskQueue
     @ObservationIgnored private let channelClients: [String: any GameChannelClient]
     @ObservationIgnored private let defaultChannelClient: any GameChannelClient
     @ObservationIgnored private var dismissedPredownloadPromptClientIDs = Set<String>()
+    @ObservationIgnored private var didInitializeEnvironment = false
 
     init(
         defaults: UserDefaults = .standard,
@@ -47,6 +52,7 @@ final class LauncherViewModel {
         configuration = LauncherConfiguration(defaults: defaults)
         store = ChannelClientStore(defaults: defaults)
         taskQueue = LauncherTaskQueue()
+        backgroundTaskQueue = LauncherTaskQueue()
         if let savedClientID = defaults.string(forKey: Keys.selectedClientID),
            resolvedClients.contains(where: { $0.descriptor.id == savedClientID }) {
             selectedClientID = savedClientID
@@ -66,6 +72,14 @@ final class LauncherViewModel {
 
     var isBusy: Bool {
         if case .running = taskStatus {
+            true
+        } else {
+            false
+        }
+    }
+
+    var isBackgroundBusy: Bool {
+        if case .running = backgroundTaskStatus {
             true
         } else {
             false
@@ -95,7 +109,7 @@ final class LauncherViewModel {
     }
 
     func predownload() async {
-        await run(.predownload)
+        await runBackground(.predownload)
     }
 
     func checkIntegrity() async {
@@ -104,6 +118,15 @@ final class LauncherViewModel {
 
     func checkLauncherUpdate() async {
         await run(.checkLauncherUpdate)
+    }
+
+    func initializeEnvironment() async {
+        guard !didInitializeEnvironment else {
+            return
+        }
+
+        didInitializeEnvironment = true
+        await run(.initEnvironment)
     }
 
     func dismissPredownload() {
@@ -124,7 +147,8 @@ final class LauncherViewModel {
             configuration: configuration.snapshot,
             installDirectory: stateBeforeRun.installDirectory.isEmpty
                 ? channelClient.virtualInstallDirectory()
-                : stateBeforeRun.installDirectory
+                : stateBeforeRun.installDirectory,
+            state: stateBeforeRun
         )
 
         let result = await taskQueue.run(
@@ -136,7 +160,7 @@ final class LauncherViewModel {
                 progress = nil
             },
             onCommand: { command in
-                handle(command, action: action)
+                handle(command, action: action, channelClient: channelClient, isBackground: false)
             },
             onFailure: { message in
                 taskStatus = .failed(message)
@@ -164,16 +188,72 @@ final class LauncherViewModel {
         }
     }
 
-    private func handle(_ command: ProgressCommand, action: LauncherAction) {
+    private func runBackground(_ action: LauncherAction) async {
+        let channelClient = selectedChannelClient
+        let stateBeforeRun = currentState
+        let context = GameChannelClientContext(
+            configuration: configuration.snapshot,
+            installDirectory: stateBeforeRun.installDirectory.isEmpty
+                ? channelClient.virtualInstallDirectory()
+                : stateBeforeRun.installDirectory,
+            state: stateBeforeRun
+        )
+
+        let result = await backgroundTaskQueue.run(
+            action: action,
+            program: channelClient.program(for: action, context: context),
+            onStart: {
+                backgroundTaskStatus = .running(action)
+                backgroundStatusText = action.title
+                backgroundProgress = nil
+            },
+            onCommand: { command in
+                handle(command, action: action, channelClient: channelClient, isBackground: true)
+            },
+            onFailure: { message in
+                backgroundTaskStatus = .failed(message)
+                backgroundStatusText = message
+                alertMessage = message
+                appendHistory(action, "\(action.title) failed: \(message)")
+            },
+            onFinish: {
+                backgroundProgress = 1
+            }
+        )
+
+        switch result {
+        case .completed:
+            complete(
+                action,
+                channelClient: channelClient,
+                stateBeforeRun: stateBeforeRun,
+                context: context,
+                isBackground: true
+            )
+        case .busy:
+            appendHistory(action, "\(action.title) ignored because another background task is running")
+        case .failed:
+            break
+        }
+    }
+
+    private func handle(
+        _ command: ProgressCommand,
+        action: LauncherAction,
+        channelClient: any GameChannelClient,
+        isBackground: Bool
+    ) {
         switch command {
         case .setProgress(let value):
-            progress = value
+            setProgress(value, isBackground: isBackground)
         case .setUndeterminedProgress:
-            progress = nil
+            setProgress(nil, isBackground: isBackground)
         case .setStateText(let text):
-            statusText = text
+            setStatusText(text, isBackground: isBackground)
         case .appendLog(let message):
             appendHistory(action, message)
+        case .setVirtualPatchState(let requiresPatchRevert):
+            setVirtualPatchState(requiresPatchRevert, for: channelClient)
         }
     }
 
@@ -181,18 +261,28 @@ final class LauncherViewModel {
         _ action: LauncherAction,
         channelClient: any GameChannelClient,
         stateBeforeRun: ChannelClientState,
-        context: GameChannelClientContext
+        context: GameChannelClientContext,
+        isBackground: Bool = false
     ) {
-        let nextState = channelClient.state(after: action, currentState: stateBeforeRun, context: context)
+        let nextState = channelClient.state(
+            after: action,
+            currentState: completionBaseState(for: channelClient, stateBeforeRun: stateBeforeRun),
+            context: context
+        )
         store.save(nextState, for: channelClient.descriptor.id)
 
         if selectedClientID == channelClient.descriptor.id {
             apply(nextState, for: channelClient)
         }
 
-        progress = 1
-        taskStatus = .completed(action)
-        appendHistory(action, "\(action.title) completed")
+        if isBackground {
+            backgroundProgress = 1
+            backgroundTaskStatus = .completed(action)
+        } else {
+            progress = 1
+            taskStatus = .completed(action)
+        }
+        appendHistory(action, completionMessage(for: action, before: stateBeforeRun, after: nextState))
     }
 
     private func restoreClientState() {
@@ -200,6 +290,9 @@ final class LauncherViewModel {
         statusText = "Ready"
         progress = nil
         taskStatus = .idle
+        backgroundStatusText = ""
+        backgroundProgress = nil
+        backgroundTaskStatus = .idle
     }
 
     private var currentState: ChannelClientState {
@@ -207,7 +300,8 @@ final class LauncherViewModel {
             installState: installState,
             installDirectory: installDirectory,
             currentVersion: currentVersion,
-            predownloadedAll: store.load(for: selectedClient.id).predownloadedAll
+            predownloadedAll: persistedState.predownloadedAll,
+            requiresPatchRevert: persistedState.requiresPatchRevert
         )
     }
 
@@ -217,6 +311,60 @@ final class LauncherViewModel {
         currentVersion = state.currentVersion
         showPredownloadPrompt = !dismissedPredownloadPromptClientIDs.contains(channelClient.descriptor.id)
             && channelClient.showPredownloadPrompt(in: state)
+    }
+
+    private var persistedState: ChannelClientState {
+        store.load(for: selectedClient.id)
+    }
+
+    private func completionBaseState(
+        for channelClient: any GameChannelClient,
+        stateBeforeRun: ChannelClientState
+    ) -> ChannelClientState {
+        var baseState = store.load(for: channelClient.descriptor.id)
+        baseState.installState = stateBeforeRun.installState
+        baseState.installDirectory = stateBeforeRun.installDirectory
+        baseState.currentVersion = stateBeforeRun.currentVersion
+        return baseState
+    }
+
+    private func setStatusText(_ text: String, isBackground: Bool) {
+        if isBackground {
+            backgroundStatusText = text
+        } else {
+            statusText = text
+        }
+    }
+
+    private func setProgress(_ value: Double?, isBackground: Bool) {
+        if isBackground {
+            backgroundProgress = value
+        } else {
+            progress = value
+        }
+    }
+
+    private func setVirtualPatchState(
+        _ requiresPatchRevert: Bool,
+        for channelClient: any GameChannelClient
+    ) {
+        var nextState = store.load(for: channelClient.descriptor.id)
+        nextState.requiresPatchRevert = requiresPatchRevert
+        store.save(nextState, for: channelClient.descriptor.id)
+    }
+
+    private func completionMessage(
+        for action: LauncherAction,
+        before: ChannelClientState,
+        after: ChannelClientState
+    ) -> String {
+        if action == .update,
+           before.installState == .installed,
+           after.installState == .notInstalled {
+            "Update skipped: unsupported version; virtual install record reset"
+        } else {
+            "\(action.title) completed"
+        }
     }
 
     private func appendHistory(_ action: LauncherAction, _ message: String) {

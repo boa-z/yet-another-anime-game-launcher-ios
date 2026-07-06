@@ -17,7 +17,7 @@ struct PredownloadPromptView: View {
                 Task { await viewModel.predownload() }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(viewModel.isBusy)
+            .disabled(viewModel.isBackgroundBusy)
         }
         .padding(14)
         .background(.green.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
@@ -29,4 +29,3 @@ struct PredownloadPromptView: View {
         .environment(LauncherViewModel.preview)
         .padding()
 }
-

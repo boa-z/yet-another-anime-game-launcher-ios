@@ -8,7 +8,9 @@ struct YaaglIOSApp: App {
         WindowGroup {
             ContentView()
                 .environment(viewModel)
+                .task {
+                    await viewModel.initializeEnvironment()
+                }
         }
     }
 }
-

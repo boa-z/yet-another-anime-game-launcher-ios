@@ -45,7 +45,8 @@ struct SimulatedGameChannelClient: GameChannelClient {
             action: action,
             client: descriptor,
             configuration: context.configuration,
-            installDirectory: context.installDirectory
+            installDirectory: context.installDirectory,
+            state: context.state
         )
     }
 
@@ -62,16 +63,20 @@ struct SimulatedGameChannelClient: GameChannelClient {
             nextState.installDirectory = context.installDirectory.isEmpty ? virtualInstallDirectory() : context.installDirectory
             nextState.currentVersion = descriptor.latestVersion
             nextState.predownloadedAll = false
+            nextState.requiresPatchRevert = false
         case .update:
             if descriptor.updatableVersions.contains(currentState.currentVersion) {
                 nextState.currentVersion = descriptor.latestVersion
                 nextState.predownloadedAll = false
+                nextState.requiresPatchRevert = false
             } else {
                 nextState = .empty
             }
         case .predownload:
             nextState.predownloadedAll = true
-        case .launch, .checkIntegrity, .initEnvironment, .checkLauncherUpdate:
+        case .launch, .checkIntegrity, .initEnvironment:
+            nextState.requiresPatchRevert = false
+        case .checkLauncherUpdate:
             break
         }
 

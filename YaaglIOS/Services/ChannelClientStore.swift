@@ -13,7 +13,8 @@ struct ChannelClientStore {
             installState: defaults.string(forKey: installStateKey(for: clientID)).flatMap(InstallState.init(rawValue:)) ?? .notInstalled,
             installDirectory: defaults.string(forKey: installDirectoryKey(for: clientID)) ?? "",
             currentVersion: defaults.string(forKey: currentVersionKey(for: clientID)) ?? "0.0.0",
-            predownloadedAll: defaults.bool(forKey: predownloadedAllKey(for: clientID))
+            predownloadedAll: defaults.bool(forKey: predownloadedAllKey(for: clientID)),
+            requiresPatchRevert: defaults.bool(forKey: requiresPatchRevertKey(for: clientID))
         )
     }
 
@@ -22,6 +23,7 @@ struct ChannelClientStore {
         defaults.set(state.installDirectory, forKey: installDirectoryKey(for: clientID))
         defaults.set(state.currentVersion, forKey: currentVersionKey(for: clientID))
         defaults.set(state.predownloadedAll, forKey: predownloadedAllKey(for: clientID))
+        defaults.set(state.requiresPatchRevert, forKey: requiresPatchRevertKey(for: clientID))
     }
 
     func clear(for clientID: String) {
@@ -29,6 +31,7 @@ struct ChannelClientStore {
         defaults.removeObject(forKey: installDirectoryKey(for: clientID))
         defaults.removeObject(forKey: currentVersionKey(for: clientID))
         defaults.removeObject(forKey: predownloadedAllKey(for: clientID))
+        defaults.removeObject(forKey: requiresPatchRevertKey(for: clientID))
     }
 
     private func installStateKey(for clientID: String) -> String {
@@ -45,5 +48,9 @@ struct ChannelClientStore {
 
     private func predownloadedAllKey(for clientID: String) -> String {
         "client.\(clientID).predownloaded_all"
+    }
+
+    private func requiresPatchRevertKey(for clientID: String) -> String {
+        "client.\(clientID).patched"
     }
 }

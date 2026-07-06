@@ -5,5 +5,5 @@ enum ProgressCommand: Sendable {
     case setUndeterminedProgress
     case setStateText(String)
     case appendLog(String)
+    case setVirtualPatchState(Bool)
 }
-

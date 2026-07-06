@@ -98,14 +98,86 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.installDirectory, "")
         XCTAssertEqual(viewModel.currentVersion, "0.0.0")
         XCTAssertEqual(viewModel.primaryAction, .install)
+        XCTAssertEqual(viewModel.statusText, "Unsupported game version 4.9.0")
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Update simulation complete" })
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Update Game completed" })
+        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Update skipped: unsupported version; virtual install record reset" })
     }
 
     @MainActor
-    private func makeViewModel(defaults: UserDefaults? = nil) -> LauncherViewModel {
+    func testInitializeEnvironmentClearsVirtualPatchMarkerOnce() async {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
+                currentVersion: "5.3.0",
+                predownloadedAll: false,
+                requiresPatchRevert: true
+            ),
+            for: "hk4e_cn"
+        )
+        let viewModel = makeViewModel(defaults: defaults)
+
+        await viewModel.initializeEnvironment()
+
+        XCTAssertFalse(store.load(for: "hk4e_cn").requiresPatchRevert)
+        XCTAssertEqual(viewModel.taskStatus, .completed(.initEnvironment))
+        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "init: virtual patched marker was cleared" })
+
+        let historyCount = viewModel.taskHistory.count
+        await viewModel.initializeEnvironment()
+
+        XCTAssertEqual(viewModel.taskHistory.count, historyCount)
+    }
+
+    @MainActor
+    func testPredownloadRunsOnBackgroundQueueWithoutBlockingPrimaryTask() async {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults, stepDurationMilliseconds: 40)
+
+        await viewModel.runPrimaryAction()
+
+        let predownloadTask = Task { @MainActor in
+            await viewModel.predownload()
+        }
+
+        while !viewModel.isBackgroundBusy {
+            await Task.yield()
+        }
+
+        XCTAssertFalse(viewModel.isBusy)
+
+        let launchTask = Task { @MainActor in
+            await viewModel.runPrimaryAction()
+        }
+
+        while !viewModel.isBusy {
+            await Task.yield()
+        }
+
+        XCTAssertTrue(viewModel.isBackgroundBusy)
+
+        await predownloadTask.value
+        await launchTask.value
+
+        XCTAssertFalse(viewModel.isBusy)
+        XCTAssertFalse(viewModel.isBackgroundBusy)
+        XCTAssertTrue(ChannelClientStore(defaults: defaults).load(for: viewModel.selectedClient.id).predownloadedAll)
+    }
+
+    @MainActor
+    private func makeViewModel(
+        defaults: UserDefaults? = nil,
+        stepDurationMilliseconds: Int = 0
+    ) -> LauncherViewModel {
         let defaults = defaults ?? makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
         return LauncherViewModel(
             defaults: defaults,
-            channelClients: GameChannelClientFactory.makeTestingClients(stepDurationMilliseconds: 0)
+            channelClients: GameChannelClientFactory.makeTestingClients(stepDurationMilliseconds: stepDurationMilliseconds)
         )
     }
 

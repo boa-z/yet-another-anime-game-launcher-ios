@@ -9,13 +9,15 @@ final class ChannelClientStoreTests: XCTestCase {
             installState: .installed,
             installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
             currentVersion: "5.3.0",
-            predownloadedAll: true
+            predownloadedAll: true,
+            requiresPatchRevert: true
         )
         let secondState = ChannelClientState(
             installState: .installed,
             installDirectory: "iOS Sandbox/VirtualGameData/hkrpg_cn",
             currentVersion: "4.3.0",
-            predownloadedAll: false
+            predownloadedAll: false,
+            requiresPatchRevert: false
         )
 
         store.save(firstState, for: "hk4e_cn")
@@ -32,7 +34,8 @@ final class ChannelClientStoreTests: XCTestCase {
             installState: .installed,
             installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
             currentVersion: "5.3.0",
-            predownloadedAll: true
+            predownloadedAll: true,
+            requiresPatchRevert: true
         )
 
         store.save(savedState, for: "hk4e_cn")

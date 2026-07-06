@@ -77,6 +77,7 @@ final class LauncherTaskQueueTests: XCTestCase {
     private static func succeedingProgram() -> CommonUpdateProgram {
         CommonUpdateProgram { continuation in
             continuation.yield(.setProgress(1))
+            continuation.yield(.setVirtualPatchState(false))
             continuation.finish()
         }
     }
