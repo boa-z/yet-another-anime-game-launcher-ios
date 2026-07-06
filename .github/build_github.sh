@@ -17,10 +17,23 @@ if [ -z "$app_path" ]; then
   exit 1
 fi
 
-rm -rf Payload "$ipa_name"
-mkdir Payload
-cp -R "$app_path" Payload/
-find Payload -name ".DS_Store" -delete
+case "$ipa_name" in
+  /*) ipa_path="$ipa_name" ;;
+  *) ipa_path="$(pwd)/$ipa_name" ;;
+esac
 
-/usr/bin/zip -qry "$ipa_name" Payload -x "._*" -x "__MACOSX/*"
-echo "Created $ipa_name from $app_path"
+payload_root="$(mktemp -d)"
+trap 'rm -rf "$payload_root"' EXIT
+
+rm -f "$ipa_path"
+mkdir "$payload_root/Payload"
+cp -R "$app_path" "$payload_root/Payload/"
+find "$payload_root/Payload" -type d -name "_CodeSignature" -prune -exec rm -rf {} +
+find "$payload_root/Payload" -name "embedded.mobileprovision" -delete
+find "$payload_root/Payload" -name ".DS_Store" -delete
+
+(
+  cd "$payload_root"
+  /usr/bin/zip -qry "$ipa_path" Payload -x "._*" -x "__MACOSX/*"
+)
+echo "Created $ipa_path from $app_path"

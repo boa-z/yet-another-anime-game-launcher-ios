@@ -39,6 +39,16 @@ struct AdvancedSettingsView: View {
                 LabeledContent("Desktop Path", value: tool.desktopExecutablePath)
             }
         }
+
+        Section("Desktop Build Channel Metadata") {
+            ForEach(DesktopBuildChannel.catalog) { channel in
+                LabeledContent(channel.id, value: channel.settingsSummary)
+
+                if channel.hasRuntimeRouting {
+                    LabeledContent("Route", value: channel.routingSummary)
+                }
+            }
+        }
     }
 }
 
