@@ -1,0 +1,64 @@
+import Foundation
+
+struct WineDistribution: Identifiable, Hashable, Sendable {
+    let id: String
+    let displayName: String
+    let remoteURL: String
+    let renderBackend: String
+    let winePath: String?
+
+    static let defaultID = "11.0-dxmt-signed-with-patches"
+
+    static let catalog = [
+        WineDistribution(
+            id: "11.0-1-crossover-signed-experimental",
+            displayName: "Wine 11.0-1 Crossover (signed, experimental)",
+            remoteURL: "https://github.com/yaagl/anime-game-wine/releases/download/wine-crossover-11.0-1-signed/wine-crossover-11.0-1-osx64-signed.tar.xz",
+            renderBackend: "dxmt",
+            winePath: "wine"
+        ),
+        WineDistribution(
+            id: defaultID,
+            displayName: "Wine 11.0 DXMT (signed, with patches)",
+            remoteURL: "https://github.com/yaagl/anime-game-wine/releases/download/wine-11.0-signed/wine-devel-11.0-osx64-signed.tar.xz",
+            renderBackend: "dxmt",
+            winePath: "wine"
+        ),
+        WineDistribution(
+            id: "11.8-dxmt-signed-experimental",
+            displayName: "Wine 11.8 DXMT (signed, experimental)",
+            remoteURL: "https://github.com/yaagl/anime-game-wine/releases/download/wine-11.8-signed/wine-devel-11.8-osx64-signed.tar.xz",
+            renderBackend: "dxmt",
+            winePath: "wine"
+        ),
+        WineDistribution(
+            id: "11.4-dxmt-signed",
+            displayName: "Wine 11.4 DXMT (signed)",
+            remoteURL: "https://github.com/dawn-winery/dawn-signed/releases/download/wine-gcenx-11.4-osx64/wine-devel-11.4-osx64-signed.tar.xz",
+            renderBackend: "dxmt",
+            winePath: "wine-devel-11.4-osx64-signed/Contents/Resources/wine"
+        ),
+        WineDistribution(
+            id: "11.0-dxmt-signed",
+            displayName: "Wine 11.0 DXMT (signed)",
+            remoteURL: "https://github.com/dawn-winery/dawn-signed/releases/download/wine-stable-gcenx-11.0-osx64/wine-stable-11.0-osx64-signed.tar.xz",
+            renderBackend: "dxmt",
+            winePath: "Wine Stable.app/Contents/Resources/wine"
+        ),
+        WineDistribution(
+            id: "9.9-dxmt",
+            displayName: "Wine 9.9 DXMT",
+            remoteURL: "https://github.com/3Shain/wine/releases/download/v9.9-mingw/wine.tar.gz",
+            renderBackend: "dxmt",
+            winePath: nil
+        )
+    ]
+
+    static func distribution(id: String) -> WineDistribution? {
+        catalog.first { $0.id == id }
+    }
+
+    static var defaultDistribution: WineDistribution {
+        distribution(id: defaultID) ?? catalog[0]
+    }
+}

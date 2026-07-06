@@ -73,7 +73,26 @@ final class LauncherConfiguration {
     }
 
     var wineDistro: String {
-        didSet { save(wineDistro, forKey: Keys.wineDistro) }
+        didSet {
+            save(wineDistro, forKey: Keys.wineDistro)
+            guard oldValue != wineDistro else {
+                return
+            }
+
+            markWineUpdatePending(for: wineDistro)
+        }
+    }
+
+    private(set) var wineState: WineState {
+        didSet { save(wineState.rawValue, forKey: Keys.wineState) }
+    }
+
+    private(set) var wineUpdateTag: String {
+        didSet { saveOptionalString(wineUpdateTag, forKey: Keys.wineUpdateTag) }
+    }
+
+    private(set) var wineUpdateURL: String {
+        didSet { saveOptionalString(wineUpdateURL, forKey: Keys.wineUpdateURL) }
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -97,7 +116,15 @@ final class LauncherConfiguration {
         resolutionWidth = defaults.integerOrDefault(forKey: Keys.resolutionWidth, defaultValue: 1920)
         resolutionHeight = defaults.integerOrDefault(forKey: Keys.resolutionHeight, defaultValue: 1080)
         hk4eEnableHDR = defaults.bool(forKey: Keys.hk4eEnableHDR)
-        wineDistro = defaults.string(forKey: Keys.wineDistro) ?? "11.0-dxmt-signed-with-patches"
+        let storedWineDistro = defaults.string(forKey: Keys.wineDistro) ?? WineDistribution.defaultID
+        if WineDistribution.distribution(id: storedWineDistro) != nil {
+            wineDistro = storedWineDistro
+        } else {
+            wineDistro = WineDistribution.defaultID
+        }
+        wineState = WineState(rawValue: defaults.string(forKey: Keys.wineState) ?? "") ?? .ready
+        wineUpdateTag = defaults.string(forKey: Keys.wineUpdateTag) ?? ""
+        wineUpdateURL = defaults.string(forKey: Keys.wineUpdateURL) ?? ""
     }
 
     var snapshot: LauncherConfigurationSnapshot {
@@ -122,6 +149,31 @@ final class LauncherConfiguration {
         )
     }
 
+    var selectedWineDistribution: WineDistribution {
+        WineDistribution.distribution(id: wineDistro) ?? .defaultDistribution
+    }
+
+    var pendingWineDistribution: WineDistribution? {
+        guard wineState == .update else {
+            return nil
+        }
+
+        return WineDistribution.distribution(id: wineUpdateTag)
+    }
+
+    private func markWineUpdatePending(for distroID: String) {
+        guard let distribution = WineDistribution.distribution(id: distroID) else {
+            wineState = .ready
+            wineUpdateTag = ""
+            wineUpdateURL = ""
+            return
+        }
+
+        wineState = .update
+        wineUpdateTag = distribution.id
+        wineUpdateURL = distribution.remoteURL
+    }
+
     private func save(_ value: Bool, forKey key: String) {
         defaults.set(value, forKey: key)
     }
@@ -132,6 +184,14 @@ final class LauncherConfiguration {
 
     private func save(_ value: String, forKey key: String) {
         defaults.set(value, forKey: key)
+    }
+
+    private func saveOptionalString(_ value: String, forKey key: String) {
+        if value.isEmpty {
+            defaults.removeObject(forKey: key)
+        } else {
+            defaults.set(value, forKey: key)
+        }
     }
 }
 
@@ -154,4 +214,7 @@ private enum Keys {
     static let resolutionHeight = "config_resolution_height"
     static let hk4eEnableHDR = "config_hk4e_enable_hdr"
     static let wineDistro = "wine_tag"
+    static let wineState = "wine_state"
+    static let wineUpdateTag = "wine_update_tag"
+    static let wineUpdateURL = "wine_update_url"
 }

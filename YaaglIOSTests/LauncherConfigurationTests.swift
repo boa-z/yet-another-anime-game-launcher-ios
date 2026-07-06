@@ -81,6 +81,43 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testWineDistributionDefaultsToDesktopDefaultTag() {
+        let configuration = LauncherConfiguration(defaults: makeDefaults())
+
+        XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
+        XCTAssertEqual(configuration.selectedWineDistribution.displayName, "Wine 11.0 DXMT (signed, with patches)")
+        XCTAssertEqual(configuration.wineState, .ready)
+        XCTAssertNil(configuration.pendingWineDistribution)
+    }
+
+    @MainActor
+    func testWineDistributionSelectionWritesDesktopPendingUpdateKeys() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        configuration.wineDistro = "11.8-dxmt-signed-experimental"
+
+        XCTAssertEqual(defaults.string(forKey: "wine_tag"), "11.8-dxmt-signed-experimental")
+        XCTAssertEqual(defaults.string(forKey: "wine_state"), "update")
+        XCTAssertEqual(defaults.string(forKey: "wine_update_tag"), "11.8-dxmt-signed-experimental")
+        XCTAssertEqual(
+            defaults.string(forKey: "wine_update_url"),
+            "https://github.com/yaagl/anime-game-wine/releases/download/wine-11.8-signed/wine-devel-11.8-osx64-signed.tar.xz"
+        )
+        XCTAssertEqual(configuration.pendingWineDistribution?.id, "11.8-dxmt-signed-experimental")
+    }
+
+    @MainActor
+    func testUnknownStoredWineDistributionFallsBackToDefault() {
+        let defaults = makeDefaults()
+        defaults.set("unknown-distro", forKey: "wine_tag")
+
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
+    }
+
+    @MainActor
     private func makeDefaults(suiteName: String = "LauncherConfigurationTests.\(UUID().uuidString)") -> UserDefaults {
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)

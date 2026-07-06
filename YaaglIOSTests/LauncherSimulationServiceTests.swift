@@ -12,8 +12,8 @@ final class LauncherSimulationServiceTests: XCTestCase {
                 client: client,
                 configuration: LauncherConfigurationSnapshot(
                     metalHud: true,
-                    retina: false,
-                    leftCmd: false,
+                    retina: true,
+                    leftCmd: true,
                     proxyEnabled: true,
                     proxyHost: "127.0.0.1:8080",
                     fpsUnlock: .disabled,
@@ -47,8 +47,10 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertLessThan(index(of: "Game is running (simulation)", in: stateTexts), index(of: "Reverting patches", in: stateTexts))
         XCTAssertTrue(logs.contains("launch dir: iOS Sandbox/VirtualGameData/hk4e_cn"))
         XCTAssertTrue(logs.contains("launch: workaround3 skips tagged patch payloads"))
-        XCTAssertTrue(logs.contains("launch: Wine distro 11.0-dxmt-signed-with-patches is simulated only"))
+        XCTAssertTrue(logs.contains("launch: Wine distro Wine 11.0 DXMT (signed, with patches) (11.0-dxmt-signed-with-patches) is simulated only"))
         XCTAssertTrue(logs.contains("launch: MTL_HUD_ENABLED=1"))
+        XCTAssertTrue(logs.contains("launch: Wine Mac Driver RetinaMode=y is simulated"))
+        XCTAssertTrue(logs.contains("launch: Wine Mac Driver LeftCommandIsCtrl=y is simulated"))
         XCTAssertTrue(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
         XCTAssertTrue(logs.contains("launch: steam.exe path is simulated"))
         XCTAssertTrue(logs.contains("launch: ReShade download is disabled"))

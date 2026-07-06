@@ -5,9 +5,18 @@ struct WineSettingsView: View {
 
     var body: some View {
         Section("Wine") {
-            TextField("Wine Distribution", text: $configuration.wineDistro)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            Picker("Wine Distribution", selection: $configuration.wineDistro) {
+                ForEach(WineDistribution.catalog) { distribution in
+                    Text(distribution.displayName).tag(distribution.id)
+                }
+            }
+
+            LabeledContent("Selected Tag", value: configuration.selectedWineDistribution.id)
+            LabeledContent("Render Backend", value: configuration.selectedWineDistribution.renderBackend.uppercased())
+
+            if let pendingWineDistribution = configuration.pendingWineDistribution {
+                LabeledContent("Pending Update", value: pendingWineDistribution.displayName)
+            }
 
             UnavailableCapabilityView(
                 title: "Wine Environment",
@@ -23,4 +32,3 @@ struct WineSettingsView: View {
         WineSettingsView(configuration: LauncherConfiguration())
     }
 }
-

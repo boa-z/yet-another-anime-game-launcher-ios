@@ -179,6 +179,8 @@ struct LauncherSimulationService: Sendable {
         installDirectory: String
     ) -> [SimulationStep] {
         let capabilities = client.gameSettingsCapabilities
+        let wineDistribution = WineDistribution.distribution(id: configuration.wineDistro)
+        let wineDistroLabel = wineDistribution.map { "\($0.displayName) (\($0.id))" } ?? configuration.wineDistro
         var steps = [
             SimulationStep(
                 "Patching game files",
@@ -194,7 +196,7 @@ struct LauncherSimulationService: Sendable {
             SimulationStep(
                 "Applying Wine configuration",
                 progress: 0.2,
-                log: "launch: Wine distro \(configuration.wineDistro) is simulated only"
+                log: "launch: Wine distro \(wineDistroLabel) is simulated only"
             )
         ]
 
@@ -204,6 +206,14 @@ struct LauncherSimulationService: Sendable {
 
         if configuration.metalHud {
             steps.append(SimulationStep("Applying Metal HUD", progress: 0.24, log: "launch: MTL_HUD_ENABLED=1"))
+        }
+
+        if configuration.retina {
+            steps.append(SimulationStep("Applying Retina mode", progress: 0.25, log: "launch: Wine Mac Driver RetinaMode=y is simulated"))
+        }
+
+        if configuration.leftCmd {
+            steps.append(SimulationStep("Applying left CMD mapping", progress: 0.25, log: "launch: Wine Mac Driver LeftCommandIsCtrl=y is simulated"))
         }
 
         if capabilities.hdr && configuration.hk4eEnableHDR {
