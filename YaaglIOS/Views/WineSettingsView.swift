@@ -17,6 +17,8 @@ struct WineSettingsView: View {
             LabeledContent("Render Backend", value: configuration.selectedWineDistribution.renderBackend.uppercased())
             LabeledContent("Translation Reference", value: translationRuntime.settingsSummary)
             LabeledContent("Translation Plan", value: translationRuntime.stageSummary)
+            LabeledContent("Box64 Sources", value: translationRuntime.sourcePathSummary)
+            LabeledContent("DynaRec Controls", value: translationRuntime.dynarecControlsSummary)
             LabeledContent("Native Bridge", value: translationRuntime.nativeBridgeSummary)
             LabeledContent("NetBIOS Name", value: configuration.wineNetbiosName)
 

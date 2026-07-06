@@ -51,8 +51,10 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch: Wine distro Wine 11.0 DXMT (signed, with patches) (11.0-dxmt-signed-with-patches) is simulated only"))
         XCTAssertTrue(logs.contains {
             $0.contains("launch: Box64-style translation reference models x86_64 -> ARM64") &&
-                $0.contains("stage plan: guest loader -> instruction decoder -> interpreter-or-dynarec dispatcher -> native library bridge") &&
-                $0.contains("disabled: runtime download, JIT memory, translated process launch")
+                $0.contains("stage plan: ELF loader -> x64 decoder -> DynaBlock planner -> ARM64 dynarec emitter -> wrapped library bridge -> signal/syscall boundary") &&
+                $0.contains("source map: ELF loader=src/elfs") &&
+                $0.contains("dynarec controls modeled: BOX64_DYNAREC, BOX64_DYNAREC_BIGBLOCK") &&
+                $0.contains("disabled: runtime download, binfmt registration, ELF process loading, executable memory/JIT")
         })
         XCTAssertTrue(logs.contains("launch: wine_netbiosname=DESKTOP-IOS0000 is simulated"))
         XCTAssertTrue(logs.contains("launch: HK4E Steam path bypasses config.bat cloud flags"))
