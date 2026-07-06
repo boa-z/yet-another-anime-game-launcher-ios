@@ -309,6 +309,7 @@ struct LauncherSimulationService: Sendable {
         let capabilities = client.gameSettingsCapabilities
         let wineDistribution = WineDistribution.distribution(id: configuration.wineDistro)
         let wineDistroLabel = wineDistribution.map { "\($0.displayName) (\($0.id))" } ?? configuration.wineDistro
+        let translationRuntime = BinaryTranslationRuntime.box64Reference
         var steps = [
             SimulationStep(
                 "Patching game files",
@@ -325,6 +326,11 @@ struct LauncherSimulationService: Sendable {
                 "Applying Wine configuration",
                 progress: 0.2,
                 log: "launch: Wine distro \(wineDistroLabel) is simulated only"
+            ),
+            SimulationStep(
+                "Planning architecture translation",
+                progress: 0.2,
+                log: translationRuntime.launchLog
             ),
             SimulationStep(
                 "Applying Wine identity",
