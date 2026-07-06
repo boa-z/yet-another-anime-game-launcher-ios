@@ -392,6 +392,69 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testLauncherUpdateCheckRecordsMetadataOnlyResult() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults, launcherUpdateService: .simulated)
+
+        await viewModel.checkLauncherUpdate()
+
+        let metadata = try XCTUnwrap(viewModel.configuration.launcherUpdateMetadata)
+
+        XCTAssertEqual(metadata.version, "999.0.0")
+        XCTAssertEqual(metadata.resourceID, viewModel.selectedClient.server.launcherUpdateResourceID)
+        XCTAssertEqual(metadata.resourceAssetName, "resources_hk4ecn.neu")
+        XCTAssertEqual(metadata.sidecarAssetName, "Yaagl.app.tar.gz")
+        XCTAssertEqual(viewModel.alertMessage, "YAAGL update 999.0.0 metadata is available. Downloads stay disabled on iOS.")
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "launcher update: metadata captured for 999.0.0 (resources_hk4ecn.neu)"
+        })
+        XCTAssertEqual(defaults.string(forKey: "launcher_update_version"), "999.0.0")
+    }
+
+    @MainActor
+    func testManualLauncherUpdateCheckStillReportsIgnoredVersion() async {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        let viewModel = makeViewModel(defaults: defaults, launcherUpdateService: .simulated)
+        viewModel.configuration.ignoreLauncherUpdate(version: "999.0.0")
+
+        await viewModel.checkLauncherUpdate()
+
+        XCTAssertNil(viewModel.configuration.pendingLauncherUpdateMetadata)
+        XCTAssertEqual(viewModel.configuration.launcherUpdateMetadata?.version, "999.0.0")
+        XCTAssertEqual(viewModel.alertMessage, "YAAGL update 999.0.0 metadata is available. Downloads stay disabled on iOS.")
+    }
+
+    @MainActor
+    func testLatestLauncherUpdateCheckClearsStoredMetadata() async {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        let latestService = LauncherUpdateMetadataService { client in
+            let resourceID = await client.server.launcherUpdateResourceID
+            return .latest(resourceID: resourceID)
+        }
+        let viewModel = makeViewModel(defaults: defaults, launcherUpdateService: latestService)
+        viewModel.configuration.recordLauncherUpdateMetadata(
+            LauncherUpdateMetadata(
+                version: "999.0.0",
+                releaseBody: "Old",
+                resourceID: "hk4ecn",
+                resourceAssetName: "resources_hk4ecn.neu",
+                downloadURL: "https://example.test/resources_hk4ecn.neu",
+                sidecarAssetName: "Yaagl.app.tar.gz",
+                sidecarDownloadURL: "https://example.test/Yaagl.app.tar.gz"
+            )
+        )
+
+        await viewModel.checkLauncherUpdate()
+
+        XCTAssertNil(viewModel.configuration.launcherUpdateMetadata)
+        XCTAssertNil(defaults.string(forKey: "launcher_update_version"))
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "launcher update: hk4ecn is already latest"
+        })
+    }
+
+    @MainActor
     func testPredownloadRunsOnBackgroundQueueWithoutBlockingPrimaryTask() async {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
@@ -535,13 +598,15 @@ final class LauncherViewModelTests: XCTestCase {
     private func makeViewModel(
         defaults: UserDefaults? = nil,
         stepDurationMilliseconds: Int = 0,
-        installProbe: VirtualInstallProbe = .trustingPersistedRecord
+        installProbe: VirtualInstallProbe = .trustingPersistedRecord,
+        launcherUpdateService: LauncherUpdateMetadataService = .simulated
     ) -> LauncherViewModel {
         let defaults = defaults ?? makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
         return LauncherViewModel(
             defaults: defaults,
             channelClients: GameChannelClientFactory.makeTestingClients(stepDurationMilliseconds: stepDurationMilliseconds),
-            installProbe: installProbe
+            installProbe: installProbe,
+            launcherUpdateService: launcherUpdateService
         )
     }
 

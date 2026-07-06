@@ -50,6 +50,7 @@ final class LauncherViewModel {
     @ObservationIgnored private let channelClients: [String: any GameChannelClient]
     @ObservationIgnored private let defaultChannelClient: any GameChannelClient
     @ObservationIgnored private let installProbe: VirtualInstallProbe
+    @ObservationIgnored private let launcherUpdateService: LauncherUpdateMetadataService
     @ObservationIgnored private var dismissedPredownloadPromptClientIDs = Set<String>()
     @ObservationIgnored private var didInitializeEnvironment = false
     @ObservationIgnored private var isRevertingClientSelection = false
@@ -57,7 +58,8 @@ final class LauncherViewModel {
     init(
         defaults: UserDefaults = .standard,
         channelClients: [any GameChannelClient] = GameChannelClientFactory.makeDefaultClients(),
-        installProbe: VirtualInstallProbe = .trustingPersistedRecord
+        installProbe: VirtualInstallProbe = .trustingPersistedRecord,
+        launcherUpdateService: LauncherUpdateMetadataService = .live
     ) {
         let resolvedClients = channelClients.isEmpty ? GameChannelClientFactory.makeDefaultClients() : channelClients
         guard let defaultChannelClient = resolvedClients.first else {
@@ -68,6 +70,7 @@ final class LauncherViewModel {
         self.channelClients = Dictionary(uniqueKeysWithValues: resolvedClients.map { ($0.descriptor.id, $0) })
         self.defaultChannelClient = defaultChannelClient
         self.installProbe = installProbe
+        self.launcherUpdateService = launcherUpdateService
         clients = resolvedClients.map(\.descriptor)
         configuration = LauncherConfiguration(defaults: defaults)
         store = ChannelClientStore(defaults: defaults)
@@ -148,7 +151,13 @@ final class LauncherViewModel {
     }
 
     func checkLauncherUpdate() async {
+        let channelClient = selectedChannelClient
         await run(.checkLauncherUpdate)
+        guard taskStatus == .completed(.checkLauncherUpdate) else {
+            return
+        }
+
+        await refreshLauncherUpdateMetadata(for: channelClient.descriptor)
     }
 
     func importExistingVirtualInstall(
@@ -462,6 +471,23 @@ final class LauncherViewModel {
         store.save(nextState, for: channelClient.descriptor.id)
     }
 
+    private func refreshLauncherUpdateMetadata(for client: GameClientDescriptor) async {
+        let result = await launcherUpdateService.check(for: client)
+
+        switch result {
+        case .available(let metadata):
+            configuration.recordLauncherUpdateMetadata(metadata)
+            alertMessage = "YAAGL update \(metadata.version) metadata is available. Downloads stay disabled on iOS."
+            appendHistory(.checkLauncherUpdate, "launcher update: metadata captured for \(metadata.displaySummary)")
+        case .latest(let resourceID):
+            configuration.clearLauncherUpdateMetadata()
+            appendHistory(.checkLauncherUpdate, "launcher update: \(resourceID) is already latest")
+        case .unavailable:
+            alertMessage = "YAAGL update metadata is unavailable."
+            appendHistory(.checkLauncherUpdate, "launcher update: GitHub metadata lookup failed")
+        }
+    }
+
     private func completionMessage(
         for action: LauncherAction,
         before: ChannelClientState,
@@ -497,7 +523,8 @@ extension LauncherViewModel {
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         return LauncherViewModel(
             defaults: defaults,
-            channelClients: GameChannelClientFactory.makeTestingClients(stepDurationMilliseconds: 0)
+            channelClients: GameChannelClientFactory.makeTestingClients(stepDurationMilliseconds: 0),
+            launcherUpdateService: .simulated
         )
     }
 }

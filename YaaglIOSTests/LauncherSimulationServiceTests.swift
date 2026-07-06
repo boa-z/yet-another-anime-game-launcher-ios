@@ -265,7 +265,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(napIntegrityLogs.contains("integrity: pkg_version scan with size/md5 checks and Aria2 repair downloads is simulated"))
         XCTAssertTrue(hk4eIntegrityLogs.contains("integrity: Sophon startRepair game_type=hk4e repair_mode=reliable is simulated"))
         XCTAssertTrue(launcherUpdateLogs.contains("launcher update: GitHub latest release lookup for bh3glb is simulated"))
-        XCTAssertTrue(launcherUpdateLogs.contains("launcher update: resources_bh3glb.neu and optional sidecar tar.gz were not downloaded"))
+        XCTAssertTrue(launcherUpdateLogs.contains("launcher update: resources_bh3glb.neu and Yaagl.Honkai.Global.app.tar.gz were not downloaded"))
         XCTAssertTrue(launcherUpdateLogs.contains("launcher update: resources.neu was not replaced"))
     }
 

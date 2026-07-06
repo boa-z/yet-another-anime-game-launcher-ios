@@ -30,6 +30,18 @@ struct GeneralSettingsView: View {
 
             LabeledContent("YAAGL Version", value: "development-ios")
 
+            if let launcherUpdate = configuration.launcherUpdateMetadata {
+                LabeledContent("Latest Update Metadata", value: launcherUpdate.displaySummary)
+                LabeledContent("Resource Asset", value: launcherUpdate.resourceAssetName)
+                if let sidecarAssetName = launcherUpdate.sidecarAssetName {
+                    LabeledContent("Sidecar Asset", value: sidecarAssetName)
+                }
+
+                Button("Ignore This Launcher Update", systemImage: "eye.slash") {
+                    configuration.ignoreLauncherUpdate(version: launcherUpdate.version)
+                }
+            }
+
             Button("Check for YAAGL Updates", systemImage: "sparkle.magnifyingglass") {
                 Task { await viewModel.checkLauncherUpdate() }
             }

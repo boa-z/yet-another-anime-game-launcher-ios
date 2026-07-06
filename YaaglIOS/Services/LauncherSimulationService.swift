@@ -112,7 +112,11 @@ struct LauncherSimulationService: Sendable {
     }
 
     private func launcherUpdateSteps(client: GameClientDescriptor) -> [SimulationStep] {
-        [
+        let resourceAssetName = LauncherUpdateMetadata.resourceAssetName(for: client.server.launcherUpdateResourceID)
+        let sidecarAssetName = LauncherUpdateMetadata.sidecarAssetName(for: client.server.launcherUpdateResourceID)
+        let blockedAssets = [resourceAssetName, sidecarAssetName].compactMap(\.self).joined(separator: " and ")
+
+        return [
             SimulationStep(
                 "Checking YAAGL Updates",
                 progress: nil,
@@ -121,7 +125,7 @@ struct LauncherSimulationService: Sendable {
             SimulationStep(
                 "Blocked launcher update download",
                 progress: 0.58,
-                log: "launcher update: resources_\(client.server.launcherUpdateResourceID).neu and optional sidecar tar.gz were not downloaded"
+                log: "launcher update: \(blockedAssets) were not downloaded"
             ),
             SimulationStep(
                 "Launcher update simulation complete",

@@ -109,6 +109,38 @@ final class LauncherConfiguration {
         didSet { saveOptionalString(wineUpdateURL, forKey: Keys.wineUpdateURL) }
     }
 
+    private(set) var ignoredLauncherUpdateVersion: String {
+        didSet { saveOptionalString(ignoredLauncherUpdateVersion, forKey: Keys.ignoredLauncherUpdateVersion) }
+    }
+
+    private(set) var launcherUpdateVersion: String {
+        didSet { saveOptionalString(launcherUpdateVersion, forKey: Keys.launcherUpdateVersion) }
+    }
+
+    private(set) var launcherUpdateReleaseBody: String {
+        didSet { saveOptionalString(launcherUpdateReleaseBody, forKey: Keys.launcherUpdateReleaseBody) }
+    }
+
+    private(set) var launcherUpdateResourceID: String {
+        didSet { saveOptionalString(launcherUpdateResourceID, forKey: Keys.launcherUpdateResourceID) }
+    }
+
+    private(set) var launcherUpdateResourceAssetName: String {
+        didSet { saveOptionalString(launcherUpdateResourceAssetName, forKey: Keys.launcherUpdateResourceAssetName) }
+    }
+
+    private(set) var launcherUpdateDownloadURL: String {
+        didSet { saveOptionalString(launcherUpdateDownloadURL, forKey: Keys.launcherUpdateDownloadURL) }
+    }
+
+    private(set) var launcherUpdateSidecarAssetName: String {
+        didSet { saveOptionalString(launcherUpdateSidecarAssetName, forKey: Keys.launcherUpdateSidecarAssetName) }
+    }
+
+    private(set) var launcherUpdateSidecarDownloadURL: String {
+        didSet { saveOptionalString(launcherUpdateSidecarDownloadURL, forKey: Keys.launcherUpdateSidecarDownloadURL) }
+    }
+
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var isCompletingWineUpdateSimulation = false
 
@@ -147,6 +179,14 @@ final class LauncherConfiguration {
         wineState = WineState(rawValue: defaults.string(forKey: Keys.wineState) ?? "") ?? .ready
         wineUpdateTag = defaults.string(forKey: Keys.wineUpdateTag) ?? ""
         wineUpdateURL = defaults.string(forKey: Keys.wineUpdateURL) ?? ""
+        ignoredLauncherUpdateVersion = defaults.string(forKey: Keys.ignoredLauncherUpdateVersion) ?? ""
+        launcherUpdateVersion = defaults.string(forKey: Keys.launcherUpdateVersion) ?? ""
+        launcherUpdateReleaseBody = defaults.string(forKey: Keys.launcherUpdateReleaseBody) ?? ""
+        launcherUpdateResourceID = defaults.string(forKey: Keys.launcherUpdateResourceID) ?? ""
+        launcherUpdateResourceAssetName = defaults.string(forKey: Keys.launcherUpdateResourceAssetName) ?? ""
+        launcherUpdateDownloadURL = defaults.string(forKey: Keys.launcherUpdateDownloadURL) ?? ""
+        launcherUpdateSidecarAssetName = defaults.string(forKey: Keys.launcherUpdateSidecarAssetName) ?? ""
+        launcherUpdateSidecarDownloadURL = defaults.string(forKey: Keys.launcherUpdateSidecarDownloadURL) ?? ""
     }
 
     var snapshot: LauncherConfigurationSnapshot {
@@ -187,6 +227,35 @@ final class LauncherConfiguration {
         return WineDistribution.distribution(id: wineUpdateTag)
     }
 
+    var launcherUpdateMetadata: LauncherUpdateMetadata? {
+        guard !launcherUpdateVersion.isEmpty,
+              !launcherUpdateResourceID.isEmpty,
+              !launcherUpdateResourceAssetName.isEmpty
+        else {
+            return nil
+        }
+
+        return LauncherUpdateMetadata(
+            version: launcherUpdateVersion,
+            releaseBody: launcherUpdateReleaseBody,
+            resourceID: launcherUpdateResourceID,
+            resourceAssetName: launcherUpdateResourceAssetName,
+            downloadURL: launcherUpdateDownloadURL,
+            sidecarAssetName: launcherUpdateSidecarAssetName.isEmpty ? nil : launcherUpdateSidecarAssetName,
+            sidecarDownloadURL: launcherUpdateSidecarDownloadURL.isEmpty ? nil : launcherUpdateSidecarDownloadURL
+        )
+    }
+
+    var pendingLauncherUpdateMetadata: LauncherUpdateMetadata? {
+        guard let metadata = launcherUpdateMetadata,
+              ignoredLauncherUpdateVersion != metadata.version
+        else {
+            return nil
+        }
+
+        return metadata
+    }
+
     func completePendingWineUpdateSimulation() {
         guard wineState == .update else {
             return
@@ -202,6 +271,34 @@ final class LauncherConfiguration {
         wineState = .ready
         wineUpdateTag = ""
         wineUpdateURL = ""
+    }
+
+    func recordLauncherUpdateMetadata(_ metadata: LauncherUpdateMetadata) {
+        launcherUpdateVersion = metadata.version
+        launcherUpdateReleaseBody = metadata.releaseBody
+        launcherUpdateResourceID = metadata.resourceID
+        launcherUpdateResourceAssetName = metadata.resourceAssetName
+        launcherUpdateDownloadURL = metadata.downloadURL
+        launcherUpdateSidecarAssetName = metadata.sidecarAssetName ?? ""
+        launcherUpdateSidecarDownloadURL = metadata.sidecarDownloadURL ?? ""
+    }
+
+    func clearLauncherUpdateMetadata() {
+        launcherUpdateVersion = ""
+        launcherUpdateReleaseBody = ""
+        launcherUpdateResourceID = ""
+        launcherUpdateResourceAssetName = ""
+        launcherUpdateDownloadURL = ""
+        launcherUpdateSidecarAssetName = ""
+        launcherUpdateSidecarDownloadURL = ""
+    }
+
+    func ignoreLauncherUpdate(version: String) {
+        ignoredLauncherUpdateVersion = version
+    }
+
+    func clearIgnoredLauncherUpdate() {
+        ignoredLauncherUpdateVersion = ""
     }
 
     private func markWineUpdatePending(for distroID: String) {
@@ -270,4 +367,12 @@ private enum Keys {
     static let wineState = "wine_state"
     static let wineUpdateTag = "wine_update_tag"
     static let wineUpdateURL = "wine_update_url"
+    static let ignoredLauncherUpdateVersion = "ignore_launcher_update"
+    static let launcherUpdateVersion = "launcher_update_version"
+    static let launcherUpdateReleaseBody = "launcher_update_body"
+    static let launcherUpdateResourceID = "launcher_update_resource_id"
+    static let launcherUpdateResourceAssetName = "launcher_update_resource_asset"
+    static let launcherUpdateDownloadURL = "launcher_update_download_url"
+    static let launcherUpdateSidecarAssetName = "launcher_update_sidecar_asset"
+    static let launcherUpdateSidecarDownloadURL = "launcher_update_sidecar_download_url"
 }

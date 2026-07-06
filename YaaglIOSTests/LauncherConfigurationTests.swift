@@ -139,6 +139,43 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testLauncherUpdateMetadataAndIgnoreVersionPersistDesktopKeys() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+        let metadata = LauncherUpdateMetadata(
+            version: "2.0.0",
+            releaseBody: "Release body",
+            resourceID: "napos",
+            resourceAssetName: "resources_napos.neu",
+            downloadURL: "https://example.test/resources_napos.neu",
+            sidecarAssetName: "Yaagl.ZZZ.OS.app.tar.gz",
+            sidecarDownloadURL: "https://example.test/Yaagl.ZZZ.OS.app.tar.gz"
+        )
+
+        configuration.recordLauncherUpdateMetadata(metadata)
+        configuration.ignoreLauncherUpdate(version: metadata.version)
+
+        XCTAssertEqual(defaults.string(forKey: "ignore_launcher_update"), "2.0.0")
+        XCTAssertEqual(defaults.string(forKey: "launcher_update_version"), "2.0.0")
+        XCTAssertEqual(defaults.string(forKey: "launcher_update_resource_id"), "napos")
+        XCTAssertEqual(configuration.launcherUpdateMetadata, metadata)
+        XCTAssertNil(configuration.pendingLauncherUpdateMetadata)
+
+        let reloadedConfiguration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertEqual(reloadedConfiguration.launcherUpdateMetadata, metadata)
+        XCTAssertEqual(reloadedConfiguration.ignoredLauncherUpdateVersion, "2.0.0")
+
+        reloadedConfiguration.clearIgnoredLauncherUpdate()
+        XCTAssertEqual(reloadedConfiguration.pendingLauncherUpdateMetadata, metadata)
+        XCTAssertNil(defaults.string(forKey: "ignore_launcher_update"))
+
+        reloadedConfiguration.clearLauncherUpdateMetadata()
+        XCTAssertNil(reloadedConfiguration.launcherUpdateMetadata)
+        XCTAssertNil(defaults.string(forKey: "launcher_update_version"))
+    }
+
+    @MainActor
     func testResolutionDefaultsMatchDesktopSettings() {
         let configuration = LauncherConfiguration(defaults: makeDefaults())
 
