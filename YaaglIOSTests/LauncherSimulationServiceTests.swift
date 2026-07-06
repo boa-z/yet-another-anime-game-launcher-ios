@@ -108,8 +108,156 @@ final class LauncherSimulationServiceTests: XCTestCase {
 
         XCTAssertTrue(stateTexts.contains("Unsupported game version 4.9.0"))
         XCTAssertFalse(stateTexts.contains("Update simulation complete"))
+        XCTAssertTrue(logs.contains("update: 4.9.0 has no desktop patch target; virtual install record will be reset"))
         XCTAssertFalse(logs.contains("update: xdelta/hpatchz and game package writes are disabled"))
         XCTAssertEqual(patchStates, [false])
+    }
+
+    @MainActor
+    func testInstallProgramEmitsDesktopPipelineTraceWithoutDownloads() async throws {
+        let service = LauncherSimulationService(stepDurationMilliseconds: 0)
+        let hk4e = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hk4e_cn" })
+        let nap = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "nap_global" })
+        let hkrpg = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hkrpg_global" })
+        let bh3 = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+
+        let hk4eLogs = try await logs(
+            service.makeProgram(
+                action: .install,
+                client: hk4e,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
+                state: .empty
+            )
+        )
+        let napLogs = try await logs(
+            service.makeProgram(
+                action: .install,
+                client: nap,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/nap_global",
+                state: .empty
+            )
+        )
+        let hkrpgLogs = try await logs(
+            service.makeProgram(
+                action: .install,
+                client: hkrpg,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/hkrpg_global",
+                state: .empty
+            )
+        )
+        let bh3Logs = try await logs(
+            service.makeProgram(
+                action: .install,
+                client: bh3,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/bh3_global",
+                state: .empty
+            )
+        )
+
+        XCTAssertTrue(hk4eLogs.contains("install: Sophon startInstallation game_type=hk4e install_reltype=cn is simulated"))
+        XCTAssertTrue(hk4eLogs.contains("install: real Sophon download is disabled on iOS"))
+        XCTAssertTrue(napLogs.contains("install: Aria2 segmented ZIP download to .ariatmp, concatenation, doStreamUnzip, cleanup, and config.ini write are simulated"))
+        XCTAssertTrue(hkrpgLogs.contains("install: Aria2 segmented 7z download to .ariatmp, doStreamUn7z, cleanup, and config.ini write are simulated"))
+        XCTAssertTrue(bh3Logs.contains("install: Aria2 game.7z download to .ariatmp, extract7z, and config.ini write are simulated"))
+        XCTAssertTrue(bh3Logs.contains("install: real Aria2 game archive download is disabled on iOS"))
+    }
+
+    @MainActor
+    func testSupportedUpdateProgramEmitsDesktopPatchPipelineTrace() async throws {
+        let service = LauncherSimulationService(stepDurationMilliseconds: 0)
+        let hk4e = GameLibrary.defaultClients[0]
+        let hkrpg = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hkrpg_global" })
+
+        let hk4eCommands = try await collect(
+            service.makeProgram(
+                action: .update,
+                client: hk4e,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
+                state: installedState(for: hk4e, at: "iOS Sandbox/VirtualGameData/hk4e_cn", currentVersion: "5.2.0")
+            )
+        )
+        let hkrpgCommands = try await collect(
+            service.makeProgram(
+                action: .update,
+                client: hkrpg,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/hkrpg_global",
+                state: installedState(for: hkrpg, at: "iOS Sandbox/VirtualGameData/hkrpg_global", currentVersion: "4.2.0")
+            )
+        )
+        let hk4eLogs = hk4eCommands.compactMap(\.log)
+        let hkrpgLogs = hkrpgCommands.compactMap(\.log)
+
+        XCTAssertTrue(hk4eLogs.contains("update: 5.2.0 -> 5.3.0"))
+        XCTAssertTrue(hk4eLogs.contains("update: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=false is simulated"))
+        XCTAssertTrue(hk4eLogs.contains("update: Sophon diff/chunk downloads and game package writes are disabled"))
+        XCTAssertTrue(hk4eLogs.contains("update: Sophon delete_file, ldiff_download_complete, chunk_progress, and delete_ldiff_file events are simulated"))
+        XCTAssertEqual(hk4eCommands.compactMap(\.virtualPatchState), [false])
+
+        XCTAssertTrue(hkrpgLogs.contains("update: 4.2.0 -> 4.3.0"))
+        XCTAssertTrue(hkrpgLogs.contains("update: Aria2 patch archive download to .ariatmp, extract7z, deletefiles.txt, hdiffmap.json, hpatchz, and audio package patches are simulated"))
+        XCTAssertTrue(hkrpgLogs.contains("update: Aria2 patch archive downloads and game package writes are disabled"))
+        XCTAssertTrue(hkrpgLogs.contains("update: extract7z output, deletefiles.txt cleanup, hdiffmap.json patch map, and config.ini rewrite are simulated"))
+        XCTAssertTrue(hkrpgLogs.contains("update: predownloaded_all and per-archive predownload markers would be cleared"))
+    }
+
+    @MainActor
+    func testPredownloadIntegrityAndLauncherUpdateTracesMatchDesktopPipelines() async throws {
+        let service = LauncherSimulationService(stepDurationMilliseconds: 0)
+        let hk4e = GameLibrary.defaultClients[0]
+        let nap = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "nap_global" })
+        let bh3 = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+
+        let hk4ePredownloadLogs = try await logs(
+            service.makeProgram(
+                action: .predownload,
+                client: hk4e,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
+                state: installedState(for: hk4e, at: "iOS Sandbox/VirtualGameData/hk4e_cn")
+            )
+        )
+        let napIntegrityLogs = try await logs(
+            service.makeProgram(
+                action: .checkIntegrity,
+                client: nap,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/nap_global",
+                state: installedState(for: nap, at: "iOS Sandbox/VirtualGameData/nap_global")
+            )
+        )
+        let hk4eIntegrityLogs = try await logs(
+            service.makeProgram(
+                action: .checkIntegrity,
+                client: hk4e,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
+                state: installedState(for: hk4e, at: "iOS Sandbox/VirtualGameData/hk4e_cn")
+            )
+        )
+        let launcherUpdateLogs = try await logs(
+            service.makeProgram(
+                action: .checkLauncherUpdate,
+                client: bh3,
+                configuration: launchSnapshot(),
+                installDirectory: "iOS Sandbox/VirtualGameData/bh3_global",
+                state: installedState(for: bh3, at: "iOS Sandbox/VirtualGameData/bh3_global")
+            )
+        )
+
+        XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=true is simulated"))
+        XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: no game archive, diff, voice pack, or Sophon manifest was requested"))
+        XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: predownloaded_all marker is simulated"))
+        XCTAssertTrue(napIntegrityLogs.contains("integrity: pkg_version scan with size/md5 checks and Aria2 repair downloads is simulated"))
+        XCTAssertTrue(hk4eIntegrityLogs.contains("integrity: Sophon startRepair game_type=hk4e repair_mode=reliable is simulated"))
+        XCTAssertTrue(launcherUpdateLogs.contains("launcher update: GitHub latest release lookup for bh3glb is simulated"))
+        XCTAssertTrue(launcherUpdateLogs.contains("launcher update: resources_bh3glb.neu and optional sidecar tar.gz were not downloaded"))
+        XCTAssertTrue(launcherUpdateLogs.contains("launcher update: resources.neu was not replaced"))
     }
 
     @MainActor
@@ -261,6 +409,10 @@ final class LauncherSimulationServiceTests: XCTestCase {
         return commands
     }
 
+    private func logs(_ program: CommonUpdateProgram) async throws -> [String] {
+        try await collect(program).compactMap(\.log)
+    }
+
     private func index(of value: String, in values: [String]) -> Int {
         guard let index = values.firstIndex(of: value) else {
             XCTFail("Missing \(value)")
@@ -270,11 +422,15 @@ final class LauncherSimulationServiceTests: XCTestCase {
     }
 
     @MainActor
-    private func installedState(for client: GameClientDescriptor, at directory: String) -> ChannelClientState {
+    private func installedState(
+        for client: GameClientDescriptor,
+        at directory: String,
+        currentVersion: String? = nil
+    ) -> ChannelClientState {
         ChannelClientState(
             installState: .installed,
             installDirectory: directory,
-            currentVersion: client.latestVersion,
+            currentVersion: currentVersion ?? client.latestVersion,
             predownloadedAll: false,
             requiresPatchRevert: false
         )

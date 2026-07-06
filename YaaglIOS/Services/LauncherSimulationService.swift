@@ -56,13 +56,7 @@ struct LauncherSimulationService: Sendable {
     ) -> [SimulationStep] {
         switch action {
         case .install:
-            [
-                SimulationStep("Allocating files on disk", progress: nil),
-                SimulationStep("Blocked game resource download for \(client.shortTitle)", progress: 0.18, log: "install: real Sophon download is disabled on iOS"),
-                SimulationStep("Creating virtual installation record", progress: 0.54),
-                SimulationStep("Saving current version \(client.latestVersion)", progress: 0.86),
-                SimulationStep("Install simulation complete", progress: 1.0)
-            ]
+            installSteps(client: client, installDirectory: installDirectory)
         case .importExisting:
             importExistingSteps(client: client, installDirectory: installDirectory, probeResult: importProbeResult)
         case .update:
@@ -70,32 +64,131 @@ struct LauncherSimulationService: Sendable {
         case .launch:
             launchSteps(client: client, configuration: configuration, installDirectory: installDirectory)
         case .predownload:
-            [
-                SimulationStep("Allocating files on disk", progress: nil),
-                SimulationStep("Blocked pre-download payload", progress: 0.35, log: "predownload: no game archive or manifest was requested"),
-                SimulationStep("Saving pre-download marker", progress: 0.78),
-                SimulationStep("Pre-download simulation complete", progress: 1.0)
-            ]
+            predownloadSteps(client: client)
         case .checkIntegrity:
-            [
-                SimulationStep("Checking game file integrity. Completed files 0/6", progress: 0.0),
-                SimulationStep("Checking game file integrity. Completed files 2/6", progress: 0.33),
-                SimulationStep("Checking game file integrity. Completed files 4/6", progress: 0.66),
-                SimulationStep(
-                    "Blocked file repair download",
-                    progress: 0.84,
-                    log: "integrity: local files were not read or repaired",
-                    virtualPatchState: false
-                ),
-                SimulationStep("Integrity simulation complete", progress: 1.0)
-            ]
+            checkIntegritySteps(client: client)
         case .initEnvironment:
             initEnvironmentSteps(requiresPatchRevert: state.requiresPatchRevert, configuration: configuration)
         case .checkLauncherUpdate:
-            [
-                SimulationStep("Checking YAAGL Updates", progress: nil),
-                SimulationStep("Launcher update simulation complete", progress: 1.0, log: "launcher update: network update check is currently local-only")
-            ]
+            launcherUpdateSteps(client: client)
+        }
+    }
+
+    private func installSteps(client: GameClientDescriptor, installDirectory: String) -> [SimulationStep] {
+        [
+            SimulationStep("Allocating files on disk", progress: nil, log: "install: target \(installDirectory)"),
+            SimulationStep("Preparing desktop install pipeline", progress: 0.12, log: installPipelineLog(for: client)),
+            SimulationStep("Blocked game resource download for \(client.shortTitle)", progress: 0.18, log: installDownloadBlockLog(for: client)),
+            SimulationStep("Creating virtual installation record", progress: 0.54, log: "install: config.ini/package version writes are represented by UserDefaults only"),
+            SimulationStep("Saving current version \(client.latestVersion)", progress: 0.86),
+            SimulationStep("Install simulation complete", progress: 1.0)
+        ]
+    }
+
+    private func predownloadSteps(client: GameClientDescriptor) -> [SimulationStep] {
+        [
+            SimulationStep("Allocating files on disk", progress: nil, log: predownloadPipelineLog(for: client)),
+            SimulationStep("Blocked pre-download payload", progress: 0.35, log: "predownload: no game archive, diff, voice pack, or Sophon manifest was requested"),
+            SimulationStep("Saving pre-download marker", progress: 0.78, log: "predownload: predownloaded_all marker is simulated"),
+            SimulationStep("Pre-download simulation complete", progress: 1.0)
+        ]
+    }
+
+    private func checkIntegritySteps(client: GameClientDescriptor) -> [SimulationStep] {
+        [
+            SimulationStep("Checking game file integrity. Completed files 0/6", progress: 0.0, log: integrityPipelineLog(for: client)),
+            SimulationStep("Checking game file integrity. Completed files 2/6", progress: 0.33),
+            SimulationStep("Checking game file integrity. Completed files 4/6", progress: 0.66),
+            SimulationStep(
+                "Blocked file repair download",
+                progress: 0.84,
+                log: "integrity: local files were not read or repaired",
+                virtualPatchState: false
+            ),
+            SimulationStep("Integrity simulation complete", progress: 1.0)
+        ]
+    }
+
+    private func launcherUpdateSteps(client: GameClientDescriptor) -> [SimulationStep] {
+        [
+            SimulationStep(
+                "Checking YAAGL Updates",
+                progress: nil,
+                log: "launcher update: GitHub latest release lookup for \(launcherUpdateResourceID(for: client)) is simulated"
+            ),
+            SimulationStep(
+                "Blocked launcher update download",
+                progress: 0.58,
+                log: "launcher update: resources_\(launcherUpdateResourceID(for: client)).neu and optional sidecar tar.gz were not downloaded"
+            ),
+            SimulationStep(
+                "Launcher update simulation complete",
+                progress: 1.0,
+                log: "launcher update: resources.neu was not replaced"
+            )
+        ]
+    }
+
+    private func installPipelineLog(for client: GameClientDescriptor) -> String {
+        switch client.gameType {
+        case "hk4e":
+            "install: Sophon startInstallation game_type=hk4e install_reltype=\(client.releaseType) is simulated"
+        case "nap":
+            "install: Aria2 segmented ZIP download to .ariatmp, concatenation, doStreamUnzip, cleanup, and config.ini write are simulated"
+        case "hkrpg":
+            "install: Aria2 segmented 7z download to .ariatmp, doStreamUn7z, cleanup, and config.ini write are simulated"
+        case "bh3":
+            "install: Aria2 game.7z download to .ariatmp, extract7z, and config.ini write are simulated"
+        default:
+            "install: desktop install pipeline is simulated"
+        }
+    }
+
+    private func installDownloadBlockLog(for client: GameClientDescriptor) -> String {
+        switch client.gameType {
+        case "hk4e":
+            "install: real Sophon download is disabled on iOS"
+        default:
+            "install: real Aria2 game archive download is disabled on iOS"
+        }
+    }
+
+    private func predownloadPipelineLog(for client: GameClientDescriptor) -> String {
+        switch client.gameType {
+        case "hk4e":
+            "predownload: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=true is simulated"
+        default:
+            "predownload: Aria2 archives would download into .ariatmp and set per-archive predownload markers"
+        }
+    }
+
+    private func integrityPipelineLog(for client: GameClientDescriptor) -> String {
+        switch client.gameType {
+        case "hk4e":
+            "integrity: Sophon startRepair game_type=hk4e repair_mode=reliable is simulated"
+        default:
+            "integrity: pkg_version scan with size/md5 checks and Aria2 repair downloads is simulated"
+        }
+    }
+
+    private func launcherUpdateResourceID(for client: GameClientDescriptor) -> String {
+        switch client.id {
+        case "hk4e_cn":
+            "hk4ecn"
+        case "hk4e_global":
+            "hk4eos"
+        case "hkrpg_cn":
+            "hkrpgcn"
+        case "hkrpg_global":
+            "hkrpgos"
+        case "nap_cn":
+            "napcn"
+        case "nap_global":
+            "napos"
+        case "bh3_global":
+            "bh3glb"
+        default:
+            client.id
         }
     }
 
@@ -487,7 +580,12 @@ struct LauncherSimulationService: Sendable {
     }
 
     private func registryDword(_ value: Int) -> String {
-        String(format: "%08x", value)
+        let hex = String(value, radix: 16)
+        guard hex.count < 8 else {
+            return hex
+        }
+
+        return String(repeating: "0", count: 8 - hex.count) + hex
     }
 
     private func patchPlanLog(
@@ -510,19 +608,60 @@ struct LauncherSimulationService: Sendable {
                 SimulationStep(
                     "Unsupported game version \(state.currentVersion)",
                     progress: 1.0,
-                    log: "update: \(state.currentVersion) is not in updatable versions; virtual install record will be reset",
+                    log: "update: \(state.currentVersion) has no desktop patch target; virtual install record will be reset",
                     virtualPatchState: false
                 )
             ]
         }
 
         return [
-            SimulationStep("Updating", progress: nil),
-            SimulationStep("Blocked incremental patch download", progress: 0.22, log: "update: xdelta/hpatchz and game package writes are disabled"),
-            SimulationStep("Simulating patch application", progress: 0.58),
-            SimulationStep("Clearing pre-download marker", progress: 0.82, virtualPatchState: false),
+            SimulationStep("Updating", progress: nil, log: "update: \(state.currentVersion) -> \(client.latestVersion)"),
+            SimulationStep("Preparing desktop update pipeline", progress: 0.12, log: updatePipelineLog(for: client)),
+            SimulationStep("Blocked incremental patch download", progress: 0.22, log: updateDownloadBlockLog(for: client)),
+            SimulationStep("Simulating patch application", progress: 0.58, log: updatePatchApplicationLog(for: client)),
+            SimulationStep(
+                "Clearing pre-download marker",
+                progress: 0.82,
+                log: "update: predownloaded_all and per-archive predownload markers would be cleared",
+                virtualPatchState: false
+            ),
             SimulationStep("Update simulation complete", progress: 1.0)
         ]
+    }
+
+    private func updatePipelineLog(for client: GameClientDescriptor) -> String {
+        switch client.gameType {
+        case "hk4e":
+            "update: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=false is simulated"
+        case "hkrpg":
+            "update: Aria2 patch archive download to .ariatmp, extract7z, deletefiles.txt, hdiffmap.json, hpatchz, and audio package patches are simulated"
+        case "nap":
+            "update: Aria2 patch archive download to .ariatmp, doStreamUnzip, deletefiles.txt, hdifffiles.txt, hpatchz, and voice pack patches are simulated"
+        case "bh3":
+            "update: Aria2 patch archive download to .ariatmp, doStreamUnzip, deletefiles.txt, hdifffiles.txt, hpatchz, and voice pack patches are simulated"
+        default:
+            "update: desktop update pipeline is simulated"
+        }
+    }
+
+    private func updateDownloadBlockLog(for client: GameClientDescriptor) -> String {
+        switch client.gameType {
+        case "hk4e":
+            "update: Sophon diff/chunk downloads and game package writes are disabled"
+        default:
+            "update: Aria2 patch archive downloads and game package writes are disabled"
+        }
+    }
+
+    private func updatePatchApplicationLog(for client: GameClientDescriptor) -> String {
+        switch client.gameType {
+        case "hk4e":
+            "update: Sophon delete_file, ldiff_download_complete, chunk_progress, and delete_ldiff_file events are simulated"
+        case "hkrpg":
+            "update: extract7z output, deletefiles.txt cleanup, hdiffmap.json patch map, and config.ini rewrite are simulated"
+        default:
+            "update: unzip output, deletefiles.txt cleanup, hdifffiles.txt patch map, and config.ini rewrite are simulated"
+        }
     }
 
     private func initEnvironmentSteps(
