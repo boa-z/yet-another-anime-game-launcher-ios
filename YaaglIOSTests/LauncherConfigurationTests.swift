@@ -139,16 +139,39 @@ final class LauncherConfigurationTests: XCTestCase {
         let defaults = makeDefaults()
         let configuration = LauncherConfiguration(defaults: defaults)
 
-        configuration.wineDistro = "11.8-dxmt-signed-experimental"
+        configuration.requestWineDistributionUpdate(id: "11.8-dxmt-signed-experimental")
 
-        XCTAssertEqual(defaults.string(forKey: "wine_tag"), "11.8-dxmt-signed-experimental")
+        XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
+        XCTAssertNil(defaults.string(forKey: "wine_tag"))
         XCTAssertEqual(defaults.string(forKey: "wine_state"), "update")
         XCTAssertEqual(defaults.string(forKey: "wine_update_tag"), "11.8-dxmt-signed-experimental")
         XCTAssertEqual(
             defaults.string(forKey: "wine_update_url"),
             "https://github.com/yaagl/anime-game-wine/releases/download/wine-11.8-signed/wine-devel-11.8-osx64-signed.tar.xz"
         )
+        XCTAssertEqual(configuration.wineDistributionSelection, "11.8-dxmt-signed-experimental")
         XCTAssertEqual(configuration.pendingWineDistribution?.id, "11.8-dxmt-signed-experimental")
+        XCTAssertEqual(configuration.snapshot.wineDistro, WineDistribution.defaultID)
+        XCTAssertEqual(configuration.snapshot.wineState, .update)
+        XCTAssertEqual(configuration.snapshot.wineUpdateTag, "11.8-dxmt-signed-experimental")
+    }
+
+    @MainActor
+    func testSelectingCurrentWineDistributionCancelsPendingUpdate() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        configuration.requestWineDistributionUpdate(id: "11.8-dxmt-signed-experimental")
+        configuration.requestWineDistributionUpdate(id: WineDistribution.defaultID)
+
+        XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
+        XCTAssertEqual(configuration.wineState, .ready)
+        XCTAssertEqual(configuration.wineDistributionSelection, WineDistribution.defaultID)
+        XCTAssertNil(configuration.pendingWineDistribution)
+        XCTAssertNil(defaults.string(forKey: "wine_tag"))
+        XCTAssertEqual(defaults.string(forKey: "wine_state"), "ready")
+        XCTAssertNil(defaults.string(forKey: "wine_update_tag"))
+        XCTAssertNil(defaults.string(forKey: "wine_update_url"))
     }
 
     @MainActor
@@ -156,9 +179,10 @@ final class LauncherConfigurationTests: XCTestCase {
         let defaults = makeDefaults()
         let configuration = LauncherConfiguration(defaults: defaults)
 
-        configuration.wineDistro = "11.8-dxmt-signed-experimental"
+        configuration.requestWineDistributionUpdate(id: "11.8-dxmt-signed-experimental")
         configuration.completePendingWineUpdateSimulation()
 
+        XCTAssertEqual(configuration.wineDistro, "11.8-dxmt-signed-experimental")
         XCTAssertEqual(configuration.wineState, .ready)
         XCTAssertNil(configuration.pendingWineDistribution)
         XCTAssertEqual(defaults.string(forKey: "wine_state"), "ready")

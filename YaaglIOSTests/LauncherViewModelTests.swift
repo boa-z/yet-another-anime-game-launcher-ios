@@ -417,13 +417,15 @@ final class LauncherViewModelTests: XCTestCase {
         let defaults = makeDefaults(suiteName: suiteName)
         let viewModel = makeViewModel(defaults: defaults)
 
-        viewModel.configuration.wineDistro = "11.8-dxmt-signed-experimental"
+        viewModel.configuration.requestWineDistributionUpdate(id: "11.8-dxmt-signed-experimental")
 
+        XCTAssertEqual(viewModel.configuration.wineDistro, WineDistribution.defaultID)
         XCTAssertEqual(viewModel.configuration.wineState, .update)
         XCTAssertEqual(defaults.string(forKey: "wine_state"), "update")
 
         await viewModel.initializeEnvironment()
 
+        XCTAssertEqual(viewModel.configuration.wineDistro, "11.8-dxmt-signed-experimental")
         XCTAssertEqual(viewModel.configuration.wineState, .ready)
         XCTAssertNil(viewModel.configuration.pendingWineDistribution)
         XCTAssertEqual(defaults.string(forKey: "wine_state"), "ready")

@@ -1,19 +1,19 @@
 import SwiftUI
 
 struct WineSettingsView: View {
-    @Bindable var configuration: LauncherConfiguration
+    var configuration: LauncherConfiguration
 
     var body: some View {
         let translationRuntime = BinaryTranslationRuntime.box64Reference
 
         Section("Wine") {
-            Picker("Wine Distribution", selection: $configuration.wineDistro) {
+            Picker("Wine Distribution", selection: wineDistributionSelection) {
                 ForEach(WineDistribution.catalog) { distribution in
                     Text(distribution.displayName).tag(distribution.id)
                 }
             }
 
-            LabeledContent("Selected Tag", value: configuration.selectedWineDistribution.id)
+            LabeledContent("Current Tag", value: configuration.selectedWineDistribution.id)
             LabeledContent("Render Backend", value: configuration.selectedWineDistribution.renderBackend.uppercased())
             LabeledContent("Translation Reference", value: translationRuntime.settingsSummary)
             LabeledContent("Translation Plan", value: translationRuntime.stageSummary)
@@ -31,6 +31,14 @@ struct WineSettingsView: View {
                 systemImage: "wineglass",
                 detail: "Wine installation is represented as configuration only in the iOS build; \(translationRuntime.safetyNote)."
             )
+        }
+    }
+
+    private var wineDistributionSelection: Binding<String> {
+        Binding {
+            configuration.wineDistributionSelection
+        } set: { distroID in
+            configuration.requestWineDistributionUpdate(id: distroID)
         }
     }
 }

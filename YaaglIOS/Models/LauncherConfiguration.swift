@@ -88,15 +88,8 @@ final class LauncherConfiguration {
         didSet { save(hk4eEnableHDR, forKey: Keys.hk4eEnableHDR) }
     }
 
-    var wineDistro: String {
-        didSet {
-            save(wineDistro, forKey: Keys.wineDistro)
-            guard oldValue != wineDistro, !isCompletingWineUpdateSimulation else {
-                return
-            }
-
-            markWineUpdatePending(for: wineDistro)
-        }
+    private(set) var wineDistro: String {
+        didSet { save(wineDistro, forKey: Keys.wineDistro) }
     }
 
     private(set) var wineNetbiosName: String {
@@ -148,7 +141,6 @@ final class LauncherConfiguration {
     }
 
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private var isCompletingWineUpdateSimulation = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -226,6 +218,14 @@ final class LauncherConfiguration {
         WineDistribution.distribution(id: wineDistro) ?? .defaultDistribution
     }
 
+    var wineDistributionSelection: String {
+        if wineState == .update, !wineUpdateTag.isEmpty {
+            wineUpdateTag
+        } else {
+            wineDistro
+        }
+    }
+
     var pendingWineDistribution: WineDistribution? {
         guard wineState == .update else {
             return nil
@@ -263,6 +263,15 @@ final class LauncherConfiguration {
         return metadata
     }
 
+    func requestWineDistributionUpdate(id distroID: String) {
+        guard distroID != wineDistro else {
+            clearPendingWineUpdate()
+            return
+        }
+
+        markWineUpdatePending(for: distroID)
+    }
+
     func completePendingWineUpdateSimulation() {
         guard wineState == .update else {
             return
@@ -270,14 +279,10 @@ final class LauncherConfiguration {
 
         let completedDistro = WineDistribution.distribution(id: wineUpdateTag)
         if let completedDistro, wineDistro != completedDistro.id {
-            isCompletingWineUpdateSimulation = true
             wineDistro = completedDistro.id
-            isCompletingWineUpdateSimulation = false
         }
 
-        wineState = .ready
-        wineUpdateTag = ""
-        wineUpdateURL = ""
+        clearPendingWineUpdate()
     }
 
     func recordLauncherUpdateMetadata(_ metadata: LauncherUpdateMetadata) {
@@ -310,15 +315,19 @@ final class LauncherConfiguration {
 
     private func markWineUpdatePending(for distroID: String) {
         guard let distribution = WineDistribution.distribution(id: distroID) else {
-            wineState = .ready
-            wineUpdateTag = ""
-            wineUpdateURL = ""
+            clearPendingWineUpdate()
             return
         }
 
         wineState = .update
         wineUpdateTag = distribution.id
         wineUpdateURL = distribution.remoteURL
+    }
+
+    private func clearPendingWineUpdate() {
+        wineState = .ready
+        wineUpdateTag = ""
+        wineUpdateURL = ""
     }
 
     private func save(_ value: Bool, forKey key: String) {
