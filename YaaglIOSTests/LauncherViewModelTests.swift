@@ -72,6 +72,21 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testAlertMessageCanBePresentedAndDismissed() async {
+        let viewModel = makeViewModel()
+
+        await viewModel.importExistingVirtualInstall(path: "   ", probeResult: .newTarget)
+
+        XCTAssertTrue(viewModel.isShowingAlert)
+        XCTAssertEqual(viewModel.alertMessage, "Import path is empty")
+
+        viewModel.dismissAlert()
+
+        XCTAssertFalse(viewModel.isShowingAlert)
+        XCTAssertNil(viewModel.alertMessage)
+    }
+
+    @MainActor
     func testDismissedPredownloadPromptIsOnlySessionLocal() async {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)

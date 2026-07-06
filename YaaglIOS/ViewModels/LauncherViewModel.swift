@@ -89,6 +89,17 @@ final class LauncherViewModel {
         }
     }
 
+    var isShowingAlert: Bool {
+        get {
+            alertMessage != nil
+        }
+        set {
+            if !newValue {
+                alertMessage = nil
+            }
+        }
+    }
+
     var updateRequired: Bool {
         selectedChannelClient.updateRequired(in: currentState)
     }
@@ -158,6 +169,10 @@ final class LauncherViewModel {
     func dismissPredownload() {
         dismissedPredownloadPromptClientIDs.insert(selectedClient.id)
         showPredownloadPrompt = false
+    }
+
+    func dismissAlert() {
+        alertMessage = nil
     }
 
     func resetVirtualInstall() {
