@@ -4,7 +4,7 @@ import Observation
 @MainActor
 @Observable
 final class LauncherViewModel {
-    let clients = GameLibrary.defaultClients
+    let clients: [GameClientDescriptor]
     let configuration: LauncherConfiguration
 
     var selectedClientID: String {
@@ -25,17 +25,43 @@ final class LauncherViewModel {
     var alertMessage: String?
 
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private let service = LauncherSimulationService()
+    @ObservationIgnored private let store: ChannelClientStore
+    @ObservationIgnored private let taskQueue: LauncherTaskQueue
+    @ObservationIgnored private let channelClients: [String: any GameChannelClient]
+    @ObservationIgnored private let defaultChannelClient: any GameChannelClient
+    @ObservationIgnored private var dismissedPredownloadPromptClientIDs = Set<String>()
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        channelClients: [any GameChannelClient] = GameChannelClientFactory.makeDefaultClients()
+    ) {
+        let resolvedClients = channelClients.isEmpty ? GameChannelClientFactory.makeDefaultClients() : channelClients
+        guard let defaultChannelClient = resolvedClients.first else {
+            fatalError("YAAGL iOS requires at least one game channel client.")
+        }
+
         self.defaults = defaults
+        self.channelClients = Dictionary(uniqueKeysWithValues: resolvedClients.map { ($0.descriptor.id, $0) })
+        self.defaultChannelClient = defaultChannelClient
+        clients = resolvedClients.map(\.descriptor)
         configuration = LauncherConfiguration(defaults: defaults)
-        selectedClientID = defaults.string(forKey: Keys.selectedClientID) ?? GameLibrary.defaultClients[0].id
+        store = ChannelClientStore(defaults: defaults)
+        taskQueue = LauncherTaskQueue()
+        if let savedClientID = defaults.string(forKey: Keys.selectedClientID),
+           resolvedClients.contains(where: { $0.descriptor.id == savedClientID }) {
+            selectedClientID = savedClientID
+        } else {
+            selectedClientID = defaultChannelClient.descriptor.id
+        }
         restoreClientState()
     }
 
     var selectedClient: GameClientDescriptor {
-        clients.first { $0.id == selectedClientID } ?? clients[0]
+        selectedChannelClient.descriptor
+    }
+
+    private var selectedChannelClient: any GameChannelClient {
+        channelClients[selectedClientID] ?? defaultChannelClient
     }
 
     var isBusy: Bool {
@@ -47,7 +73,7 @@ final class LauncherViewModel {
     }
 
     var updateRequired: Bool {
-        installState == .installed && SemanticVersion(currentVersion) < SemanticVersion(selectedClient.latestVersion)
+        selectedChannelClient.updateRequired(in: currentState)
     }
 
     var primaryAction: LauncherAction {
@@ -61,11 +87,7 @@ final class LauncherViewModel {
     }
 
     var predownloadTitle: String {
-        if let version = selectedClient.predownloadVersion {
-            "Pre-download \(version)"
-        } else {
-            "Pre-download"
-        }
+        selectedChannelClient.predownloadTitle(in: currentState)
     }
 
     func runPrimaryAction() async {
@@ -85,39 +107,61 @@ final class LauncherViewModel {
     }
 
     func dismissPredownload() {
+        dismissedPredownloadPromptClientIDs.insert(selectedClient.id)
         showPredownloadPrompt = false
-        defaults.set(true, forKey: predownloadDismissedKey(for: selectedClient.id))
     }
 
     func resetVirtualInstall() {
-        defaults.removeObject(forKey: installStateKey(for: selectedClient.id))
-        defaults.removeObject(forKey: installDirectoryKey(for: selectedClient.id))
-        defaults.removeObject(forKey: currentVersionKey(for: selectedClient.id))
-        defaults.removeObject(forKey: predownloadDismissedKey(for: selectedClient.id))
+        store.clear(for: selectedClient.id)
         restoreClientState()
         appendHistory(.initEnvironment, "Virtual install record cleared")
     }
 
     private func run(_ action: LauncherAction) async {
-        guard !isBusy else { return }
-
-        taskStatus = .running(action)
-        statusText = action.title
-        progress = nil
-
-        let client = selectedClient
-        let stream = service.makeProgram(
-            action: action,
-            client: client,
+        let channelClient = selectedChannelClient
+        let stateBeforeRun = currentState
+        let context = GameChannelClientContext(
             configuration: configuration.snapshot,
-            installDirectory: installDirectory.isEmpty ? virtualDirectory(for: client) : installDirectory
+            installDirectory: stateBeforeRun.installDirectory.isEmpty
+                ? channelClient.virtualInstallDirectory()
+                : stateBeforeRun.installDirectory
         )
 
-        for await command in stream {
-            handle(command, action: action)
-        }
+        let result = await taskQueue.run(
+            action: action,
+            program: channelClient.program(for: action, context: context),
+            onStart: {
+                taskStatus = .running(action)
+                statusText = action.title
+                progress = nil
+            },
+            onCommand: { command in
+                handle(command, action: action)
+            },
+            onFailure: { message in
+                taskStatus = .failed(message)
+                statusText = message
+                alertMessage = message
+                appendHistory(action, "\(action.title) failed: \(message)")
+            },
+            onFinish: {
+                progress = 1
+            }
+        )
 
-        complete(action, client: client)
+        switch result {
+        case .completed:
+            complete(
+                action,
+                channelClient: channelClient,
+                stateBeforeRun: stateBeforeRun,
+                context: context
+            )
+        case .busy:
+            appendHistory(action, "\(action.title) ignored because another task is running")
+        case .failed:
+            break
+        }
     }
 
     private func handle(_ command: ProgressCommand, action: LauncherAction) {
@@ -133,24 +177,17 @@ final class LauncherViewModel {
         }
     }
 
-    private func complete(_ action: LauncherAction, client: GameClientDescriptor) {
-        switch action {
-        case .install:
-            installState = .installed
-            installDirectory = virtualDirectory(for: client)
-            currentVersion = client.latestVersion
-            persistClientState(client)
-            showPredownloadPrompt = shouldShowPredownload(for: client)
-        case .update:
-            currentVersion = client.latestVersion
-            defaults.set(false, forKey: predownloadDismissedKey(for: client.id))
-            persistClientState(client)
-            showPredownloadPrompt = shouldShowPredownload(for: client)
-        case .predownload:
-            showPredownloadPrompt = false
-            defaults.set(true, forKey: predownloadDismissedKey(for: client.id))
-        case .launch, .checkIntegrity, .initEnvironment, .checkLauncherUpdate:
-            break
+    private func complete(
+        _ action: LauncherAction,
+        channelClient: any GameChannelClient,
+        stateBeforeRun: ChannelClientState,
+        context: GameChannelClientContext
+    ) {
+        let nextState = channelClient.state(after: action, currentState: stateBeforeRun, context: context)
+        store.save(nextState, for: channelClient.descriptor.id)
+
+        if selectedClientID == channelClient.descriptor.id {
+            apply(nextState, for: channelClient)
         }
 
         progress = 1
@@ -159,36 +196,27 @@ final class LauncherViewModel {
     }
 
     private func restoreClientState() {
-        let client = selectedClient
-        installState = defaults.string(forKey: installStateKey(for: client.id)).flatMap(InstallState.init(rawValue:)) ?? .notInstalled
-        installDirectory = defaults.string(forKey: installDirectoryKey(for: client.id)) ?? ""
-        currentVersion = defaults.string(forKey: currentVersionKey(for: client.id)) ?? "0.0.0"
+        apply(store.load(for: selectedClient.id), for: selectedChannelClient)
         statusText = "Ready"
         progress = nil
         taskStatus = .idle
-        showPredownloadPrompt = shouldShowPredownload(for: client)
     }
 
-    private func persistClientState(_ client: GameClientDescriptor) {
-        defaults.set(installState.rawValue, forKey: installStateKey(for: client.id))
-        defaults.set(installDirectory, forKey: installDirectoryKey(for: client.id))
-        defaults.set(currentVersion, forKey: currentVersionKey(for: client.id))
+    private var currentState: ChannelClientState {
+        ChannelClientState(
+            installState: installState,
+            installDirectory: installDirectory,
+            currentVersion: currentVersion,
+            predownloadedAll: store.load(for: selectedClient.id).predownloadedAll
+        )
     }
 
-    private func shouldShowPredownload(for client: GameClientDescriptor) -> Bool {
-        guard installState == .installed,
-              client.predownloadAvailable,
-              let version = client.predownloadVersion
-        else {
-            return false
-        }
-
-        let dismissed = defaults.bool(forKey: predownloadDismissedKey(for: client.id))
-        return !dismissed && SemanticVersion(version) > SemanticVersion(currentVersion)
-    }
-
-    private func virtualDirectory(for client: GameClientDescriptor) -> String {
-        "iOS Sandbox/VirtualGameData/\(client.id)"
+    private func apply(_ state: ChannelClientState, for channelClient: any GameChannelClient) {
+        installState = state.installState
+        installDirectory = state.installDirectory
+        currentVersion = state.currentVersion
+        showPredownloadPrompt = !dismissedPredownloadPromptClientIDs.contains(channelClient.descriptor.id)
+            && channelClient.showPredownloadPrompt(in: state)
     }
 
     private func appendHistory(_ action: LauncherAction, _ message: String) {
@@ -197,33 +225,19 @@ final class LauncherViewModel {
             taskHistory.removeLast(taskHistory.count - 80)
         }
     }
-
-    private func installStateKey(for clientID: String) -> String {
-        "client.\(clientID).install_state"
-    }
-
-    private func installDirectoryKey(for clientID: String) -> String {
-        "client.\(clientID).install_dir"
-    }
-
-    private func currentVersionKey(for clientID: String) -> String {
-        "client.\(clientID).current_version"
-    }
-
-    private func predownloadDismissedKey(for clientID: String) -> String {
-        "client.\(clientID).predownloaded_all"
-    }
 }
 
 extension LauncherViewModel {
     static var preview: LauncherViewModel {
         let suiteName = "LauncherViewModel.preview.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
-        return LauncherViewModel(defaults: defaults)
+        return LauncherViewModel(
+            defaults: defaults,
+            channelClients: GameChannelClientFactory.makeTestingClients(stepDurationMilliseconds: 0)
+        )
     }
 }
 
 private enum Keys {
     static let selectedClientID = "selected_client_id"
 }
-

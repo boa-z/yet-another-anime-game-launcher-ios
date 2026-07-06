@@ -1,12 +1,18 @@
 import Foundation
 
-struct LauncherSimulationService {
+struct LauncherSimulationService: Sendable {
+    let stepDurationMilliseconds: Int
+
+    init(stepDurationMilliseconds: Int = 320) {
+        self.stepDurationMilliseconds = stepDurationMilliseconds
+    }
+
     func makeProgram(
         action: LauncherAction,
         client: GameClientDescriptor,
         configuration: LauncherConfigurationSnapshot,
         installDirectory: String
-    ) -> AsyncStream<ProgressCommand> {
+    ) -> CommonUpdateProgram {
         let steps = steps(
             for: action,
             client: client,
@@ -14,7 +20,7 @@ struct LauncherSimulationService {
             installDirectory: installDirectory
         )
 
-        return AsyncStream { continuation in
+        return CommonUpdateProgram { continuation in
             Task {
                 for step in steps {
                     continuation.yield(.setStateText(step.message))
@@ -26,7 +32,7 @@ struct LauncherSimulationService {
                     if let log = step.log {
                         continuation.yield(.appendLog(log))
                     }
-                    try? await Task.sleep(for: .milliseconds(step.durationMilliseconds))
+                    try? await Task.sleep(for: .milliseconds(stepDurationMilliseconds))
                 }
                 continuation.finish()
             }
@@ -135,18 +141,14 @@ private struct SimulationStep: Sendable {
     let message: String
     let progress: Double?
     let log: String?
-    let durationMilliseconds: Int
 
     init(
         _ message: String,
         progress: Double?,
-        log: String? = nil,
-        durationMilliseconds: Int = 320
+        log: String? = nil
     ) {
         self.message = message
         self.progress = progress
         self.log = log
-        self.durationMilliseconds = durationMilliseconds
     }
 }
-
