@@ -5,6 +5,12 @@ struct AdvancedSettingsView: View {
 
     var body: some View {
         Section("Advanced") {
+            UnavailableCapabilityView(
+                title: "Advanced Settings",
+                systemImage: "exclamationmark.triangle",
+                detail: "Do not change these settings unless you know what they do."
+            )
+
             Picker("Unlock FPS Limit", selection: $configuration.fpsUnlock) {
                 ForEach(FPSUnlockOption.allCases) { option in
                     Text(option.title).tag(option)
@@ -27,4 +33,3 @@ struct AdvancedSettingsView: View {
         AdvancedSettingsView(configuration: LauncherConfiguration())
     }
 }
-

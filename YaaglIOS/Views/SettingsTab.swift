@@ -1,6 +1,6 @@
 import Foundation
 
-enum SettingsTab: String, CaseIterable, Identifiable {
+nonisolated enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case game
     case wine
@@ -8,6 +8,14 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case licenses
 
     var id: String { rawValue }
+
+    static func visibleTabs(advancedVisible: Bool) -> [SettingsTab] {
+        if advancedVisible {
+            return [.general, .game, .wine, .advanced, .licenses]
+        }
+
+        return [.general, .game, .wine, .licenses]
+    }
 
     var title: String {
         switch self {
@@ -24,4 +32,3 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         }
     }
 }
-

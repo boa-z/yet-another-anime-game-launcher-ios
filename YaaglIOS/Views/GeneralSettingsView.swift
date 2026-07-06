@@ -3,6 +3,8 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @Environment(LauncherViewModel.self) private var viewModel
     @Bindable var configuration: LauncherConfiguration
+    @State private var versionTapTimestamps: [Date] = []
+    @State private var isShowingAdvancedUnlockAlert = false
 
     var body: some View {
         Section("General") {
@@ -28,7 +30,12 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            LabeledContent("YAAGL Version", value: "development-ios")
+            Button {
+                registerVersionTap()
+            } label: {
+                LabeledContent("YAAGL Version", value: "development-ios")
+            }
+            .buttonStyle(.plain)
 
             if let launcherUpdate = configuration.launcherUpdateMetadata {
                 LabeledContent("Latest Update Metadata", value: launcherUpdate.displaySummary)
@@ -49,6 +56,37 @@ struct GeneralSettingsView: View {
             Button("Reset Virtual Install", systemImage: "arrow.counterclockwise", role: .destructive) {
                 viewModel.resetVirtualInstall()
             }
+        }
+        .alert("Advanced settings are now available.", isPresented: $isShowingAdvancedUnlockAlert) {
+            Button("OK", role: .cancel) {}
+        }
+    }
+
+    private func registerVersionTap() {
+        guard LauncherConfiguration.advancedSettingsUnlockEnabled else {
+            return
+        }
+
+        let now = Date.now
+        versionTapTimestamps.append(now)
+        if versionTapTimestamps.count > 6 {
+            versionTapTimestamps.removeFirst(versionTapTimestamps.count - 6)
+        }
+
+        guard versionTapTimestamps.count > 5 else {
+            return
+        }
+
+        let comparisonTap = versionTapTimestamps[versionTapTimestamps.count - 5]
+        guard now.timeIntervalSince(comparisonTap) < 1 else {
+            return
+        }
+
+        let wasHidden = !configuration.advancedSettingsVisible
+        configuration.advancedSettingsVisible.toggle()
+        versionTapTimestamps.removeAll()
+        if wasHidden {
+            isShowingAdvancedUnlockAlert = true
         }
     }
 }

@@ -81,6 +81,35 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testAdvancedSettingsVisibilityPersistsDesktopKey() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertFalse(configuration.advancedSettingsVisible)
+        XCTAssertNil(defaults.string(forKey: "config_advanced"))
+
+        configuration.advancedSettingsVisible = true
+
+        XCTAssertEqual(defaults.string(forKey: "config_advanced"), "true")
+        XCTAssertTrue(LauncherConfiguration(defaults: defaults).advancedSettingsVisible)
+
+        configuration.advancedSettingsVisible = false
+
+        XCTAssertEqual(defaults.string(forKey: "config_advanced"), "false")
+        XCTAssertFalse(LauncherConfiguration(defaults: defaults).advancedSettingsVisible)
+    }
+
+    @MainActor
+    func testAdvancedSettingsVisibilityLoadsLegacyBoolValue() {
+        let defaults = makeDefaults()
+        defaults.set(true, forKey: "config_advanced")
+
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertTrue(configuration.advancedSettingsVisible)
+    }
+
+    @MainActor
     func testWineDistributionDefaultsToDesktopDefaultTag() {
         let configuration = LauncherConfiguration(defaults: makeDefaults())
 

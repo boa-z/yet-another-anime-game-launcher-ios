@@ -4,6 +4,8 @@ import Observation
 @MainActor
 @Observable
 final class LauncherConfiguration {
+    static let advancedSettingsUnlockEnabled = true
+
     var metalHud: Bool {
         didSet { save(metalHud, forKey: Keys.metalHud) }
     }
@@ -30,6 +32,10 @@ final class LauncherConfiguration {
 
     var uiLocale: UILocaleOption {
         didSet { save(uiLocale.rawValue, forKey: Keys.uiLocale) }
+    }
+
+    var advancedSettingsVisible: Bool {
+        didSet { saveDesktopBoolString(advancedSettingsVisible, forKey: Keys.advancedSettingsVisible) }
     }
 
     var reshade: Bool {
@@ -153,6 +159,7 @@ final class LauncherConfiguration {
         proxyHost = defaults.string(forKey: Keys.proxyHost) ?? "127.0.0.1:8080"
         fpsUnlock = FPSUnlockOption.option(forStoredValue: defaults.string(forKey: Keys.fpsUnlock)) ?? .disabled
         uiLocale = UILocaleOption.option(forStoredValue: defaults.string(forKey: Keys.uiLocale)) ?? .defaultOption
+        advancedSettingsVisible = Self.advancedSettingsUnlockEnabled && Self.loadDesktopBool(defaults, forKey: Keys.advancedSettingsVisible)
         reshade = defaults.bool(forKey: Keys.reshade)
         patchOff = defaults.bool(forKey: Keys.patchOff)
         workaround3 = defaults.object(forKey: Keys.workaround3) as? Bool ?? true
@@ -334,6 +341,22 @@ final class LauncherConfiguration {
         }
     }
 
+    private func saveDesktopBoolString(_ value: Bool, forKey key: String) {
+        defaults.set(value ? "true" : "false", forKey: key)
+    }
+
+    private static func loadDesktopBool(_ defaults: UserDefaults, forKey key: String) -> Bool {
+        if let storedString = defaults.object(forKey: key) as? String {
+            return storedString == "true"
+        }
+
+        if let storedBool = defaults.object(forKey: key) as? Bool {
+            return storedBool
+        }
+
+        return false
+    }
+
     private static func generateWineNetbiosName() -> String {
         let characters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
         let suffix = (0..<7).map { _ in
@@ -352,6 +375,7 @@ private enum Keys {
     static let proxyHost = "config_proxyHost"
     static let fpsUnlock = "config_fps_unlock"
     static let uiLocale = "config_uiLocale"
+    static let advancedSettingsVisible = "config_advanced"
     static let reshade = "config_reshade"
     static let patchOff = "config_patch_off"
     static let workaround3 = "config_workaround3"
