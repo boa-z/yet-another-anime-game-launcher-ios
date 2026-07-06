@@ -178,11 +178,12 @@ struct LauncherSimulationService: Sendable {
         configuration: LauncherConfigurationSnapshot,
         installDirectory: String
     ) -> [SimulationStep] {
+        let capabilities = client.gameSettingsCapabilities
         var steps = [
             SimulationStep(
                 "Patching game files",
                 progress: nil,
-                log: patchPlanLog(configuration),
+                log: patchPlanLog(configuration, capabilities: capabilities),
                 virtualPatchState: true
             ),
             SimulationStep(
@@ -197,7 +198,7 @@ struct LauncherSimulationService: Sendable {
             )
         ]
 
-        if configuration.patchOff {
+        if capabilities.patchOff && configuration.patchOff {
             steps.append(SimulationStep("Skipping game patch", progress: 0.22, log: "launch: patchOff requested no game file patch"))
         }
 
@@ -205,11 +206,11 @@ struct LauncherSimulationService: Sendable {
             steps.append(SimulationStep("Applying Metal HUD", progress: 0.24, log: "launch: MTL_HUD_ENABLED=1"))
         }
 
-        if configuration.hk4eEnableHDR {
+        if capabilities.hdr && configuration.hk4eEnableHDR {
             steps.append(SimulationStep("Simulating HDR registry write", progress: 0.26))
         }
 
-        if configuration.resolutionCustom {
+        if capabilities.resolution && configuration.resolutionCustom {
             steps.append(
                 SimulationStep(
                     "Applying \(configuration.resolutionWidth)x\(configuration.resolutionHeight)",
@@ -226,15 +227,15 @@ struct LauncherSimulationService: Sendable {
             steps.append(SimulationStep("Applying proxy \(configuration.proxyHost)", progress: 0.52))
         }
 
-        if configuration.timeoutFix {
+        if capabilities.timeoutFix && configuration.timeoutFix {
             steps.append(SimulationStep("Applying timeout fix", progress: 0.56, log: "launch: WINE_ENABLE_TIMEOUT_FIX=1"))
         }
 
-        if configuration.blockNet {
+        if capabilities.blockNet && configuration.blockNet {
             steps.append(SimulationStep("Blocked hosts file modification", progress: 0.62, log: "launch: hosts edit is disabled on iOS"))
         }
 
-        if configuration.steamPatch {
+        if capabilities.steamPatch && configuration.steamPatch {
             steps.append(SimulationStep("Preparing Steam launch path", progress: 0.68, log: "launch: steam.exe path is simulated"))
         }
 
@@ -247,10 +248,13 @@ struct LauncherSimulationService: Sendable {
         return steps
     }
 
-    private func patchPlanLog(_ configuration: LauncherConfigurationSnapshot) -> String {
-        if configuration.patchOff {
+    private func patchPlanLog(
+        _ configuration: LauncherConfigurationSnapshot,
+        capabilities: GameSettingsCapabilities
+    ) -> String {
+        if capabilities.patchOff && configuration.patchOff {
             "launch: game AC patch is disabled"
-        } else if configuration.workaround3 {
+        } else if capabilities.workaround3 && configuration.workaround3 {
             "launch: workaround3 skips tagged patch payloads"
         } else {
             "launch: full patch payload set is simulated"

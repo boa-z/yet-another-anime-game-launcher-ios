@@ -85,8 +85,8 @@ final class LauncherConfiguration {
         leftCmd = defaults.bool(forKey: Keys.leftCmd)
         proxyEnabled = defaults.bool(forKey: Keys.proxyEnabled)
         proxyHost = defaults.string(forKey: Keys.proxyHost) ?? "127.0.0.1:8080"
-        fpsUnlock = FPSUnlockOption(rawValue: defaults.string(forKey: Keys.fpsUnlock) ?? "") ?? .disabled
-        uiLocale = UILocaleOption(rawValue: defaults.string(forKey: Keys.uiLocale) ?? "") ?? .simplifiedChinese
+        fpsUnlock = FPSUnlockOption.option(forStoredValue: defaults.string(forKey: Keys.fpsUnlock)) ?? .disabled
+        uiLocale = UILocaleOption.option(forStoredValue: defaults.string(forKey: Keys.uiLocale)) ?? .defaultOption
         reshade = defaults.bool(forKey: Keys.reshade)
         patchOff = defaults.bool(forKey: Keys.patchOff)
         workaround3 = defaults.object(forKey: Keys.workaround3) as? Bool ?? true

@@ -103,6 +103,56 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertEqual(patchStates, [false])
     }
 
+    @MainActor
+    func testLaunchProgramIgnoresUnsupportedGameSettingsForBH3() async throws {
+        let service = LauncherSimulationService(stepDurationMilliseconds: 0)
+        let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+        let commands = try await collect(
+            service.makeProgram(
+                action: .launch,
+                client: client,
+                configuration: LauncherConfigurationSnapshot(
+                    metalHud: true,
+                    retina: false,
+                    leftCmd: false,
+                    proxyEnabled: true,
+                    proxyHost: "127.0.0.1:8080",
+                    fpsUnlock: .disabled,
+                    reshade: true,
+                    patchOff: true,
+                    workaround3: true,
+                    steamPatch: true,
+                    blockNet: true,
+                    timeoutFix: true,
+                    resolutionCustom: true,
+                    resolutionWidth: 2560,
+                    resolutionHeight: 1440,
+                    hk4eEnableHDR: true,
+                    wineDistro: "11.0-dxmt-signed-with-patches"
+                ),
+                installDirectory: "iOS Sandbox/VirtualGameData/bh3_global",
+                state: ChannelClientState(
+                    installState: .installed,
+                    installDirectory: "iOS Sandbox/VirtualGameData/bh3_global",
+                    currentVersion: client.latestVersion,
+                    predownloadedAll: false,
+                    requiresPatchRevert: false
+                )
+            )
+        )
+        let stateTexts = commands.compactMap(\.stateText)
+        let logs = commands.compactMap(\.log)
+
+        XCTAssertTrue(logs.contains("launch: full patch payload set is simulated"))
+        XCTAssertFalse(logs.contains("launch: game AC patch is disabled"))
+        XCTAssertFalse(logs.contains("launch: workaround3 skips tagged patch payloads"))
+        XCTAssertFalse(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
+        XCTAssertFalse(logs.contains("launch: steam.exe path is simulated"))
+        XCTAssertFalse(logs.contains("launch: hosts edit is disabled on iOS"))
+        XCTAssertFalse(stateTexts.contains("Simulating HDR registry write"))
+        XCTAssertFalse(stateTexts.contains("Applying 2560x1440"))
+    }
+
     private func collect(_ program: CommonUpdateProgram) async throws -> [CapturedCommand] {
         var commands = [CapturedCommand]()
         for try await command in program {
