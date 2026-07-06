@@ -63,14 +63,18 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains(dxmtBlockLog))
         XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(logs.contains("launch: MTL_HUD_ENABLED=1"))
+        XCTAssertTrue(logs.contains("launch env preview: MTL_HUD_ENABLED=1"))
         XCTAssertTrue(logs.contains("launch: Wine Mac Driver RetinaMode=y is simulated"))
         XCTAssertTrue(logs.contains("launch: Wine Mac Driver LeftCommandIsCtrl=y is simulated"))
         XCTAssertTrue(logs.contains("launch: HK4E HDR registry HKEY_CURRENT_USER\\SOFTWARE\\miHoYo\\原神 WINDOWS_HDR_ON_h3132281285=dword:00000001 is simulated"))
         XCTAssertTrue(logs.contains("launch: HK4E resolution registry HKEY_CURRENT_USER\\SOFTWARE\\miHoYo\\原神 Screenmanager Is Fullscreen mode_h3981298716=dword:00000000 Screenmanager Resolution Width_h182942802=dword:00000a00 Screenmanager Resolution Height_h2627697771=dword:000005a0 is simulated"))
         XCTAssertTrue(logs.contains("launch: HTTP_PROXY=127.0.0.1:8080; HTTPS_PROXY=127.0.0.1:8080"))
+        XCTAssertTrue(logs.contains("launch env preview: HTTP_PROXY=127.0.0.1:8080 HTTPS_PROXY=127.0.0.1:8080"))
         XCTAssertTrue(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
+        XCTAssertTrue(logs.contains("launch env preview: WINE_ENABLE_TIMEOUT_FIX=1"))
         XCTAssertTrue(logs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 dispatchcnglobal.yuanshen.com for 10s"))
         XCTAssertTrue(logs.contains("launch: would execute C:\\windows\\system32\\steam.exe with YuanShen.exe"))
+        XCTAssertTrue(logs.contains("launch command preview: ./wine/bin/wine64 C:\\\\windows\\\\system32\\\\steam.exe YuanShen.exe (not executed)"))
         let reshadeBlockLog = "dependency: ReShade 5.8.0 metadata mirrors installed_reshade; " +
             "ReShade_Setup_5.8.0_Addon.exe, d3dcompiler_47.dll, ReShade64.dll, ReShade.ini were not downloaded"
         XCTAssertTrue(logs.contains(reshadeBlockLog))
@@ -377,6 +381,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(batchLogs.contains("launch: WINEMSYNC=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(batchLogs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 globaldp-prod-os01.zenlesszonezero.com for 20s"))
         XCTAssertTrue(batchLogs.contains("launch: would execute cmd /c config.bat for ZenlessZoneZero.exe"))
+        XCTAssertTrue(batchLogs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for ZenlessZoneZero.exe (not executed)"))
         XCTAssertTrue(batchLogs.contains("launch: NAP Screenmanager registry cleanup is simulated"))
         XCTAssertFalse(batchLogs.contains { $0.contains("Steam path bypasses resolution args") })
 
@@ -399,6 +404,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
 
         XCTAssertTrue(steamLogs.contains("launch: NAP Steam path bypasses resolution args -screen-width 1280 -screen-height 720 -screen-fullscreen 0"))
         XCTAssertTrue(steamLogs.contains("launch: would execute C:\\windows\\system32\\steam.exe with ZenlessZoneZero.exe"))
+        XCTAssertTrue(steamLogs.contains("launch command preview: ./wine/bin/wine64 C:\\\\windows\\\\system32\\\\steam.exe ZenlessZoneZero.exe (not executed)"))
         XCTAssertFalse(steamLogs.contains("launch: NAP args -screen-width 1280 -screen-height 720 -screen-fullscreen 0"))
     }
 
@@ -431,7 +437,9 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60;dxgi.customVendorId=10de;dxgi.customDeviceId=2684; DXMT_ENABLE_NVEXT=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(logs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 globaldp-prod-os01.starrails.com for 15s"))
         XCTAssertTrue(logs.contains("launch: HTTP_PROXY=127.0.0.1:8080; HTTPS_PROXY=127.0.0.1:8080"))
+        XCTAssertTrue(logs.contains("launch env preview: HTTP_PROXY=127.0.0.1:8080 HTTPS_PROXY=127.0.0.1:8080"))
         XCTAssertTrue(logs.contains("launch: would execute cmd /c config.bat for StarRail.exe"))
+        XCTAssertTrue(logs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for StarRail.exe (not executed)"))
         XCTAssertFalse(logs.contains { $0.contains("steam.exe") })
         XCTAssertFalse(logs.contains { $0.contains("resolution registry") })
         XCTAssertFalse(logs.contains { $0.contains("HDR registry") })
@@ -506,6 +514,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(launchLogs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
         XCTAssertTrue(launchLogs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
         XCTAssertTrue(launchLogs.contains("launch: would execute cmd /c config.bat for Game/Binaries/Win64/Game.exe"))
+        XCTAssertTrue(launchLogs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for Game/Binaries/Win64/Game.exe (not executed)"))
 
         let cnLaunchLogs = try await logs(
             service.makeProgram(

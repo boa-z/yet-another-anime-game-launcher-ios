@@ -412,6 +412,11 @@ struct LauncherSimulationService: Sendable {
 
         if configuration.metalHud {
             steps.append(SimulationStep("Applying Metal HUD", progress: 0.24, log: "launch: MTL_HUD_ENABLED=1"))
+            steps.append(SimulationStep(
+                "Previewing Metal HUD environment",
+                progress: 0.24,
+                log: "launch env preview: \(DesktopCommandBuilder.buildEnvironment([(key: "MTL_HUD_ENABLED", value: "1")]))"
+            ))
         }
 
         steps.append(SimulationStep(
@@ -450,11 +455,23 @@ struct LauncherSimulationService: Sendable {
         }
 
         if configuration.proxyEnabled {
+            let proxyEnvironment = DesktopCommandBuilder.buildEnvironment(
+                [
+                    (key: "HTTP_PROXY", value: configuration.proxyHost),
+                    (key: "HTTPS_PROXY", value: configuration.proxyHost)
+                ]
+            )
             steps.append(SimulationStep("Applying proxy \(configuration.proxyHost)", progress: 0.52, log: "launch: HTTP_PROXY=\(configuration.proxyHost); HTTPS_PROXY=\(configuration.proxyHost)"))
+            steps.append(SimulationStep("Previewing proxy environment", progress: 0.52, log: "launch env preview: \(proxyEnvironment)"))
         }
 
         if capabilities.timeoutFix && configuration.timeoutFix {
             steps.append(SimulationStep("Applying timeout fix", progress: 0.56, log: "launch: WINE_ENABLE_TIMEOUT_FIX=1"))
+            steps.append(SimulationStep(
+                "Previewing timeout environment",
+                progress: 0.56,
+                log: "launch env preview: \(DesktopCommandBuilder.buildEnvironment([(key: "WINE_ENABLE_TIMEOUT_FIX", value: "1")]))"
+            ))
         }
 
         if capabilities.blockNet && configuration.blockNet {
@@ -465,6 +482,12 @@ struct LauncherSimulationService: Sendable {
             "Preparing launch command",
             progress: 0.68,
             log: launchExecutionPlanLog(client: client, configuration: configuration, capabilities: capabilities)
+        ))
+
+        steps.append(SimulationStep(
+            "Previewing sanitized launch command",
+            progress: 0.68,
+            log: launchCommandPreviewLog(client: client, configuration: configuration, capabilities: capabilities)
         ))
 
         steps.append(SimulationStep("Game is running (simulation)", progress: 0.78, log: "launch: \(client.executable) was not executed"))
@@ -683,7 +706,32 @@ struct LauncherSimulationService: Sendable {
         if capabilities.steamPatch && configuration.steamPatch {
             return "launch: would execute C:\\windows\\system32\\steam.exe with \(client.executable)"
         }
+
         return "launch: would execute cmd /c config.bat for \(client.executable)"
+    }
+
+    private func launchCommandPreviewLog(
+        client: GameClientDescriptor,
+        configuration: LauncherConfigurationSnapshot,
+        capabilities: GameSettingsCapabilities
+    ) -> String {
+        let wineBinary = "./wine/bin/wine64"
+        if capabilities.steamPatch && configuration.steamPatch {
+            let command = DesktopCommandBuilder.build([
+                wineBinary,
+                "C:\\windows\\system32\\steam.exe",
+                client.executable
+            ])
+            return "launch command preview: \(command) (not executed)"
+        }
+
+        let command = DesktopCommandBuilder.build([
+            wineBinary,
+            "cmd",
+            "/c",
+            "config.bat"
+        ])
+        return "launch command preview: \(command) for \(client.executable) (not executed)"
     }
 
     private func launchRevertPlanSteps(
