@@ -9,6 +9,22 @@ final class LauncherViewModel {
 
     var selectedClientID: String {
         didSet {
+            guard !isRevertingClientSelection else {
+                return
+            }
+
+            guard oldValue != selectedClientID else {
+                return
+            }
+
+            if isBusy || isBackgroundBusy {
+                isRevertingClientSelection = true
+                selectedClientID = oldValue
+                isRevertingClientSelection = false
+                alertMessage = "Finish the current task before switching clients."
+                return
+            }
+
             defaults.set(selectedClientID, forKey: Keys.selectedClientID)
             restoreClientState()
         }
@@ -36,6 +52,7 @@ final class LauncherViewModel {
     @ObservationIgnored private let installProbe: VirtualInstallProbe
     @ObservationIgnored private var dismissedPredownloadPromptClientIDs = Set<String>()
     @ObservationIgnored private var didInitializeEnvironment = false
+    @ObservationIgnored private var isRevertingClientSelection = false
 
     init(
         defaults: UserDefaults = .standard,

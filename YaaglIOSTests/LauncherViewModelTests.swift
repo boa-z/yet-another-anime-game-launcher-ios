@@ -374,6 +374,51 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testClientSwitchIsBlockedWhileForegroundTaskRuns() async {
+        let viewModel = makeViewModel(stepDurationMilliseconds: 40)
+        let originalClientID = viewModel.selectedClientID
+        let nextClientID = viewModel.clients[1].id
+
+        let installTask = Task { @MainActor in
+            await viewModel.runPrimaryAction()
+        }
+
+        while !viewModel.isBusy {
+            await Task.yield()
+        }
+
+        viewModel.selectedClientID = nextClientID
+
+        XCTAssertEqual(viewModel.selectedClientID, originalClientID)
+        XCTAssertEqual(viewModel.alertMessage, "Finish the current task before switching clients.")
+
+        await installTask.value
+    }
+
+    @MainActor
+    func testClientSwitchIsBlockedWhileBackgroundTaskRuns() async {
+        let viewModel = makeViewModel(stepDurationMilliseconds: 40)
+        let originalClientID = viewModel.selectedClientID
+        let nextClientID = viewModel.clients[1].id
+
+        await viewModel.runPrimaryAction()
+        let predownloadTask = Task { @MainActor in
+            await viewModel.predownload()
+        }
+
+        while !viewModel.isBackgroundBusy {
+            await Task.yield()
+        }
+
+        viewModel.selectedClientID = nextClientID
+
+        XCTAssertEqual(viewModel.selectedClientID, originalClientID)
+        XCTAssertEqual(viewModel.alertMessage, "Finish the current task before switching clients.")
+
+        await predownloadTask.value
+    }
+
+    @MainActor
     private func makeViewModel(
         defaults: UserDefaults? = nil,
         stepDurationMilliseconds: Int = 0,
