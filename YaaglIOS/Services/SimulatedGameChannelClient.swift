@@ -84,7 +84,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
             nextState.predownloadedArchiveKeys = PredownloadArchiveMarker.markers(for: descriptor).map(\.key).sorted()
         case .launch, .checkIntegrity, .initEnvironment:
             nextState.requiresPatchRevert = false
-        case .checkLauncherUpdate:
+        case .checkLauncherUpdate, .settingsQuickAction:
             break
         }
 

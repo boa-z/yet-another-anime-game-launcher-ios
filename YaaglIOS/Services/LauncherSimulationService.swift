@@ -71,6 +71,8 @@ struct LauncherSimulationService: Sendable {
             initEnvironmentSteps(requiresPatchRevert: state.requiresPatchRevert, configuration: configuration)
         case .checkLauncherUpdate:
             launcherUpdateSteps(client: client)
+        case .settingsQuickAction:
+            []
         }
     }
 

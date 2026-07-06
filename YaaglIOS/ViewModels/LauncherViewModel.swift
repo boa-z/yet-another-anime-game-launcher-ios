@@ -207,6 +207,22 @@ final class LauncherViewModel {
         appendHistory(.initEnvironment, "Virtual install record cleared")
     }
 
+    func openWineCommandLineTool() {
+        alertMessage = "Wine command line is unavailable in the iOS build."
+        appendHistory(.settingsQuickAction, "settings quick action: Wine command line request was recorded; no shell was launched")
+    }
+
+    func openGameInstallDirectory() {
+        let path = installDirectory.isEmpty ? selectedChannelClient.virtualInstallDirectory() : installDirectory
+        alertMessage = "Game install directory open request was recorded for \(path)."
+        appendHistory(.settingsQuickAction, "settings quick action: game install directory open request for \(path) was recorded; no external file manager was launched")
+    }
+
+    func openYaaglDataDirectory() {
+        alertMessage = "YAAGL data directory open request was recorded for the iOS sandbox."
+        appendHistory(.settingsQuickAction, "settings quick action: YAAGL data directory open request for iOS sandbox was recorded; no external file manager was launched")
+    }
+
     private func run(
         _ action: LauncherAction,
         installDirectoryOverride: String? = nil,

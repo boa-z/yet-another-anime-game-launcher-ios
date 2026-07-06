@@ -9,6 +9,7 @@ enum LauncherAction: String, Identifiable, Sendable {
     case checkIntegrity
     case initEnvironment
     case checkLauncherUpdate
+    case settingsQuickAction
 
     var id: String { rawValue }
 
@@ -30,6 +31,8 @@ enum LauncherAction: String, Identifiable, Sendable {
             "Initialize"
         case .checkLauncherUpdate:
             "Check YAAGL Updates"
+        case .settingsQuickAction:
+            "Settings Quick Action"
         }
     }
 
@@ -51,6 +54,8 @@ enum LauncherAction: String, Identifiable, Sendable {
             "wrench.and.screwdriver"
         case .checkLauncherUpdate:
             "sparkle.magnifyingglass"
+        case .settingsQuickAction:
+            "bolt"
         }
     }
 }

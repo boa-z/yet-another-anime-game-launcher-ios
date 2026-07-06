@@ -87,6 +87,24 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsQuickOpenActionsAreRecordedWithoutExternalLaunch() {
+        let viewModel = makeViewModel()
+
+        viewModel.openWineCommandLineTool()
+        viewModel.openGameInstallDirectory()
+        viewModel.openYaaglDataDirectory()
+
+        let messages = viewModel.taskHistory.map(\.message)
+
+        XCTAssertEqual(viewModel.installState, .notInstalled)
+        XCTAssertTrue(viewModel.taskHistory.allSatisfy { $0.action == .settingsQuickAction })
+        XCTAssertTrue(messages.contains("settings quick action: Wine command line request was recorded; no shell was launched"))
+        XCTAssertTrue(messages.contains("settings quick action: game install directory open request for iOS Sandbox/VirtualGameData/hk4e_cn was recorded; no external file manager was launched"))
+        XCTAssertTrue(messages.contains("settings quick action: YAAGL data directory open request for iOS sandbox was recorded; no external file manager was launched"))
+        XCTAssertEqual(viewModel.alertMessage, "YAAGL data directory open request was recorded for the iOS sandbox.")
+    }
+
+    @MainActor
     func testDismissedPredownloadPromptIsOnlySessionLocal() async {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)

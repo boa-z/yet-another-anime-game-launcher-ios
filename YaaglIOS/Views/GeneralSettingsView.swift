@@ -49,16 +49,35 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            Button("Check for YAAGL Updates", systemImage: "sparkle.magnifyingglass") {
-                Task { await viewModel.checkLauncherUpdate() }
-            }
-
             Button("Reset Virtual Install", systemImage: "arrow.counterclockwise", role: .destructive) {
                 viewModel.resetVirtualInstall()
             }
         }
         .alert("Advanced settings are now available.", isPresented: $isShowingAdvancedUnlockAlert) {
             Button("OK", role: .cancel) {}
+        }
+
+        Section("Quick Actions") {
+            Button("Check Integrity", systemImage: "checkmark.shield") {
+                Task { await viewModel.checkIntegrity() }
+            }
+            .disabled(viewModel.installState == .notInstalled || viewModel.isBusy)
+
+            Button("Launch Wine Command Line Tool", systemImage: "terminal") {
+                viewModel.openWineCommandLineTool()
+            }
+
+            Button("Open Game Install Directory", systemImage: "folder") {
+                viewModel.openGameInstallDirectory()
+            }
+
+            Button("Open YAAGL Data Directory", systemImage: "folder.badge.gearshape") {
+                viewModel.openYaaglDataDirectory()
+            }
+
+            Button("Check for YAAGL Updates", systemImage: "sparkle.magnifyingglass") {
+                Task { await viewModel.checkLauncherUpdate() }
+            }
         }
     }
 
