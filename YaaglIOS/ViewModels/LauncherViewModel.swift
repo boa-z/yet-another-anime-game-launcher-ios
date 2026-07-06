@@ -439,10 +439,16 @@ final class LauncherViewModel {
     }
 
     private func setProgress(_ value: Double?, isBackground: Bool) {
-        if isBackground {
-            backgroundProgress = value
+        let displayValue: Double? = if let value, value > 0 {
+            value
         } else {
-            progress = value
+            nil
+        }
+
+        if isBackground {
+            backgroundProgress = displayValue
+        } else {
+            progress = displayValue
         }
     }
 

@@ -374,6 +374,27 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testZeroProgressIsDisplayedAsIndeterminate() async {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        let viewModel = LauncherViewModel(
+            defaults: defaults,
+            channelClients: [ZeroProgressChannelClient(descriptor: GameLibrary.defaultClients[0])]
+        )
+
+        let integrityTask = Task { @MainActor in
+            await viewModel.checkIntegrity()
+        }
+
+        while viewModel.statusText != "Zero progress" {
+            await Task.yield()
+        }
+
+        XCTAssertNil(viewModel.progress)
+
+        await integrityTask.value
+    }
+
+    @MainActor
     func testClientSwitchIsBlockedWhileForegroundTaskRuns() async {
         let viewModel = makeViewModel(stepDurationMilliseconds: 40)
         let originalClientID = viewModel.selectedClientID
@@ -437,5 +458,45 @@ final class LauncherViewModelTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+}
+
+private struct ZeroProgressChannelClient: GameChannelClient {
+    let descriptor: GameClientDescriptor
+
+    func updateRequired(in state: ChannelClientState) -> Bool {
+        false
+    }
+
+    func showPredownloadPrompt(in state: ChannelClientState) -> Bool {
+        false
+    }
+
+    func predownloadTitle(in state: ChannelClientState) -> String {
+        "Pre-download"
+    }
+
+    func virtualInstallDirectory() -> String {
+        "iOS Sandbox/VirtualGameData/zero_progress"
+    }
+
+    func program(for action: LauncherAction, context: GameChannelClientContext) -> CommonUpdateProgram {
+        CommonUpdateProgram { continuation in
+            Task {
+                continuation.yield(.setStateText("Zero progress"))
+                continuation.yield(.setProgress(0))
+                try? await Task.sleep(for: .milliseconds(120))
+                continuation.yield(.setProgress(1))
+                continuation.finish()
+            }
+        }
+    }
+
+    func state(
+        after action: LauncherAction,
+        currentState: ChannelClientState,
+        context: GameChannelClientContext
+    ) -> ChannelClientState {
+        currentState
     }
 }
