@@ -91,6 +91,21 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testWineNetbiosNameIsGeneratedAndPersistedWithDesktopShape() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertTrue(configuration.wineNetbiosName.hasPrefix("DESKTOP-"))
+        XCTAssertEqual(configuration.wineNetbiosName.count, 15)
+        XCTAssertEqual(defaults.string(forKey: "wine_netbiosname"), configuration.wineNetbiosName)
+        XCTAssertEqual(configuration.snapshot.wineNetbiosName, configuration.wineNetbiosName)
+
+        let reloadedConfiguration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertEqual(reloadedConfiguration.wineNetbiosName, configuration.wineNetbiosName)
+    }
+
+    @MainActor
     func testWineDistributionSelectionWritesDesktopPendingUpdateKeys() {
         let defaults = makeDefaults()
         let configuration = LauncherConfiguration(defaults: defaults)

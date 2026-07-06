@@ -18,6 +18,7 @@ struct LauncherConfigurationSnapshot: Sendable {
     let resolutionHeight: Int
     let hk4eEnableHDR: Bool
     let wineDistro: String
+    let wineNetbiosName: String
     let wineState: WineState
     let wineUpdateTag: String
     let wineUpdateURL: String
@@ -40,6 +41,7 @@ struct LauncherConfigurationSnapshot: Sendable {
         resolutionHeight: Int,
         hk4eEnableHDR: Bool,
         wineDistro: String,
+        wineNetbiosName: String = "DESKTOP-IOS0000",
         wineState: WineState = .ready,
         wineUpdateTag: String = "",
         wineUpdateURL: String = ""
@@ -61,6 +63,7 @@ struct LauncherConfigurationSnapshot: Sendable {
         self.resolutionHeight = resolutionHeight
         self.hk4eEnableHDR = hk4eEnableHDR
         self.wineDistro = wineDistro
+        self.wineNetbiosName = wineNetbiosName
         self.wineState = wineState
         self.wineUpdateTag = wineUpdateTag
         self.wineUpdateURL = wineUpdateURL

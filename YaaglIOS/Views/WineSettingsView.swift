@@ -13,6 +13,7 @@ struct WineSettingsView: View {
 
             LabeledContent("Selected Tag", value: configuration.selectedWineDistribution.id)
             LabeledContent("Render Backend", value: configuration.selectedWineDistribution.renderBackend.uppercased())
+            LabeledContent("NetBIOS Name", value: configuration.wineNetbiosName)
 
             if let pendingWineDistribution = configuration.pendingWineDistribution {
                 LabeledContent("Pending Update", value: pendingWineDistribution.displayName)

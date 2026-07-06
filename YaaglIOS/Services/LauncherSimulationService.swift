@@ -294,6 +294,11 @@ struct LauncherSimulationService: Sendable {
                 "Applying Wine configuration",
                 progress: 0.2,
                 log: "launch: Wine distro \(wineDistroLabel) is simulated only"
+            ),
+            SimulationStep(
+                "Applying Wine identity",
+                progress: 0.2,
+                log: "launch: wine_netbiosname=\(configuration.wineNetbiosName) is simulated"
             )
         ]
 

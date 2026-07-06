@@ -93,6 +93,10 @@ final class LauncherConfiguration {
         }
     }
 
+    private(set) var wineNetbiosName: String {
+        didSet { save(wineNetbiosName, forKey: Keys.wineNetbiosName) }
+    }
+
     private(set) var wineState: WineState {
         didSet { save(wineState.rawValue, forKey: Keys.wineState) }
     }
@@ -133,6 +137,13 @@ final class LauncherConfiguration {
         } else {
             wineDistro = WineDistribution.defaultID
         }
+        if let storedWineNetbiosName = defaults.string(forKey: Keys.wineNetbiosName) {
+            wineNetbiosName = storedWineNetbiosName
+        } else {
+            let generatedWineNetbiosName = Self.generateWineNetbiosName()
+            wineNetbiosName = generatedWineNetbiosName
+            defaults.set(generatedWineNetbiosName, forKey: Keys.wineNetbiosName)
+        }
         wineState = WineState(rawValue: defaults.string(forKey: Keys.wineState) ?? "") ?? .ready
         wineUpdateTag = defaults.string(forKey: Keys.wineUpdateTag) ?? ""
         wineUpdateURL = defaults.string(forKey: Keys.wineUpdateURL) ?? ""
@@ -157,6 +168,7 @@ final class LauncherConfiguration {
             resolutionHeight: resolutionHeight,
             hk4eEnableHDR: hk4eEnableHDR,
             wineDistro: wineDistro,
+            wineNetbiosName: wineNetbiosName,
             wineState: wineState,
             wineUpdateTag: wineUpdateTag,
             wineUpdateURL: wineUpdateURL
@@ -224,6 +236,15 @@ final class LauncherConfiguration {
             defaults.set(value, forKey: key)
         }
     }
+
+    private static func generateWineNetbiosName() -> String {
+        let characters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+        let suffix = (0..<7).map { _ in
+            String(characters[Int.random(in: characters.indices)])
+        }.joined()
+
+        return "DESKTOP-\(suffix)"
+    }
 }
 
 private enum Keys {
@@ -245,6 +266,7 @@ private enum Keys {
     static let resolutionHeight = "config_resolution_height"
     static let hk4eEnableHDR = "config_hk4e_enable_hdr"
     static let wineDistro = "wine_tag"
+    static let wineNetbiosName = "wine_netbiosname"
     static let wineState = "wine_state"
     static let wineUpdateTag = "wine_update_tag"
     static let wineUpdateURL = "wine_update_url"

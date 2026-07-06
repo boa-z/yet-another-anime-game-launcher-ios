@@ -49,6 +49,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch: workaround3 skips tagged patch payloads"))
         XCTAssertTrue(logs.contains("launch: desktop removed-file patch plan moves YuanShen_Data/upload_crash.exe, YuanShen_Data/Plugins/crashreport.exe, YuanShen_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
         XCTAssertTrue(logs.contains("launch: Wine distro Wine 11.0 DXMT (signed, with patches) (11.0-dxmt-signed-with-patches) is simulated only"))
+        XCTAssertTrue(logs.contains("launch: wine_netbiosname=DESKTOP-IOS0000 is simulated"))
         XCTAssertTrue(logs.contains("launch: HK4E Steam path bypasses config.bat cloud flags"))
         XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(logs.contains("launch: MTL_HUD_ENABLED=1"))
