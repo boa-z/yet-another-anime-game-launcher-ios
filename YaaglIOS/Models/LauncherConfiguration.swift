@@ -61,11 +61,21 @@ final class LauncherConfiguration {
     }
 
     var resolutionWidth: Int {
-        didSet { save(resolutionWidth, forKey: Keys.resolutionWidth) }
+        didSet {
+            if resolutionWidth < 1 {
+                resolutionWidth = 1
+            }
+            save(resolutionWidth, forKey: Keys.resolutionWidth)
+        }
     }
 
     var resolutionHeight: Int {
-        didSet { save(resolutionHeight, forKey: Keys.resolutionHeight) }
+        didSet {
+            if resolutionHeight < 1 {
+                resolutionHeight = 1
+            }
+            save(resolutionHeight, forKey: Keys.resolutionHeight)
+        }
     }
 
     var hk4eEnableHDR: Bool {
@@ -113,8 +123,8 @@ final class LauncherConfiguration {
         blockNet = defaults.bool(forKey: Keys.blockNet)
         timeoutFix = defaults.bool(forKey: Keys.timeoutFix)
         resolutionCustom = defaults.bool(forKey: Keys.resolutionCustom)
-        resolutionWidth = defaults.integerOrDefault(forKey: Keys.resolutionWidth, defaultValue: 1920)
-        resolutionHeight = defaults.integerOrDefault(forKey: Keys.resolutionHeight, defaultValue: 1080)
+        resolutionWidth = max(1, defaults.integerOrDefault(forKey: Keys.resolutionWidth, defaultValue: 1920))
+        resolutionHeight = max(1, defaults.integerOrDefault(forKey: Keys.resolutionHeight, defaultValue: 1920))
         hk4eEnableHDR = defaults.bool(forKey: Keys.hk4eEnableHDR)
         let storedWineDistro = defaults.string(forKey: Keys.wineDistro) ?? WineDistribution.defaultID
         if WineDistribution.distribution(id: storedWineDistro) != nil {

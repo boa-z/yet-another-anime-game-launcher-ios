@@ -108,6 +108,29 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testResolutionDefaultsMatchDesktopSettings() {
+        let configuration = LauncherConfiguration(defaults: makeDefaults())
+
+        XCTAssertFalse(configuration.resolutionCustom)
+        XCTAssertEqual(configuration.resolutionWidth, 1920)
+        XCTAssertEqual(configuration.resolutionHeight, 1920)
+    }
+
+    @MainActor
+    func testResolutionValuesAreConstrainedToPositiveIntegers() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        configuration.resolutionWidth = 0
+        configuration.resolutionHeight = -12
+
+        XCTAssertEqual(configuration.resolutionWidth, 1)
+        XCTAssertEqual(configuration.resolutionHeight, 1)
+        XCTAssertEqual(defaults.integer(forKey: "config_resolution_width"), 1)
+        XCTAssertEqual(defaults.integer(forKey: "config_resolution_height"), 1)
+    }
+
+    @MainActor
     func testUnknownStoredWineDistributionFallsBackToDefault() {
         let defaults = makeDefaults()
         defaults.set("unknown-distro", forKey: "wine_tag")
