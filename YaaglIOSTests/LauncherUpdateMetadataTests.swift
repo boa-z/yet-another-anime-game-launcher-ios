@@ -5,6 +5,8 @@ final class LauncherUpdateMetadataTests: XCTestCase {
     func testResourceAssetNameMatchesDesktopPattern() {
         XCTAssertEqual(LauncherUpdateMetadata.resourceAssetName(for: "hk4ecn"), "resources_hk4ecn.neu")
         XCTAssertEqual(LauncherUpdateMetadata.resourceAssetName(for: "napos"), "resources_napos.neu")
+        XCTAssertEqual(LauncherUpdateMetadata.resourceAssetName(for: "cbjq"), "resources_cbjq.neu")
+        XCTAssertEqual(LauncherUpdateMetadata.resourceAssetName(for: "cbjqcn"), "resources_cbjqcn.neu")
     }
 
     func testSidecarAssetNamesMatchDesktopUpdaterSwitch() {
@@ -15,6 +17,8 @@ final class LauncherUpdateMetadataTests: XCTestCase {
         XCTAssertEqual(LauncherUpdateMetadata.sidecarAssetName(for: "hkrpgos"), "Yaagl.HSR.OS.app.tar.gz")
         XCTAssertEqual(LauncherUpdateMetadata.sidecarAssetName(for: "napcn"), "Yaagl.ZZZ.app.tar.gz")
         XCTAssertEqual(LauncherUpdateMetadata.sidecarAssetName(for: "napos"), "Yaagl.ZZZ.OS.app.tar.gz")
+        XCTAssertNil(LauncherUpdateMetadata.sidecarAssetName(for: "cbjq"))
+        XCTAssertNil(LauncherUpdateMetadata.sidecarAssetName(for: "cbjqcn"))
         XCTAssertNil(LauncherUpdateMetadata.sidecarAssetName(for: "unknown"))
     }
 }

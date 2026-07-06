@@ -3,7 +3,7 @@ import Foundation
 nonisolated struct DependencyResource: Identifiable, Hashable, Sendable {
     let id: String
     let displayName: String
-    let installedVersionKey: String
+    let installedVersionKey: String?
     let currentVersion: String
     let artifactNames: [String]
     let remoteURLs: [String]
@@ -11,7 +11,11 @@ nonisolated struct DependencyResource: Identifiable, Hashable, Sendable {
     let iOSAvailabilityNote: String
 
     var settingsSummary: String {
-        "\(currentVersion) (\(installedVersionKey))"
+        if let installedVersionKey {
+            "\(currentVersion) (\(installedVersionKey))"
+        } else {
+            "\(currentVersion) (no desktop installed-version key)"
+        }
     }
 
     var artifactSummary: String {
@@ -19,7 +23,11 @@ nonisolated struct DependencyResource: Identifiable, Hashable, Sendable {
     }
 
     var downloadBlockLog: String {
-        "dependency: \(displayName) \(currentVersion) metadata mirrors \(installedVersionKey); \(artifactSummary) were not downloaded"
+        if let installedVersionKey {
+            "dependency: \(displayName) \(currentVersion) metadata mirrors \(installedVersionKey); \(artifactSummary) were not downloaded"
+        } else {
+            "dependency: \(displayName) \(currentVersion) metadata has no desktop installed-version key; \(artifactSummary) were not downloaded"
+        }
     }
 
     static let catalog: [DependencyResource] = [
@@ -86,6 +94,30 @@ nonisolated struct DependencyResource: Identifiable, Hashable, Sendable {
             ],
             desktopInstallPath: "./reshade",
             iOSAvailabilityNote: "metadata only; installer extraction and Wine path writes are disabled"
+        ),
+        DependencyResource(
+            id: "media-foundation",
+            displayName: "Media Foundation",
+            installedVersionKey: nil,
+            currentVersion: "mf-install",
+            artifactNames: [
+                "colorcnv.dll",
+                "mf.dll",
+                "mferror.dll",
+                "mfplat.dll",
+                "mfplay.dll",
+                "mfreadwrite.dll",
+                "msmpeg2adec.dll",
+                "msmpeg2vdec.dll",
+                "sqmapi.dll",
+                "mf.reg",
+                "wmf.reg"
+            ],
+            remoteURLs: [
+                "https://github.com/Ultimator14/mf-install/raw/master/system32/{dll}.dll"
+            ],
+            desktopInstallPath: "Wine prefix drive_c/windows/system32",
+            iOSAvailabilityNote: "metadata only; DLL downloads, registry imports, and regsvr32 calls are disabled"
         )
     ]
 

@@ -14,10 +14,12 @@ final class PredownloadArchiveMarkerTests: XCTestCase {
         let hkrpg = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hkrpg_global" })
         let bh3 = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
         let hk4e = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hk4e_cn" })
+        let cbjq = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "cbjq_global" })
 
         XCTAssertEqual(PredownloadArchiveMarker.markers(for: nap).count, 2)
         XCTAssertEqual(PredownloadArchiveMarker.markers(for: hkrpg).count, 2)
         XCTAssertEqual(PredownloadArchiveMarker.markers(for: bh3).count, 2)
         XCTAssertEqual(PredownloadArchiveMarker.markers(for: hk4e), [])
+        XCTAssertEqual(PredownloadArchiveMarker.markers(for: cbjq), [])
     }
 }

@@ -61,6 +61,34 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testCBJQManifestSupportedVersionUpdatesWithoutStaticPatchList() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let cbjq = try XCTUnwrap(viewModel.clients.first { $0.id == "cbjq_global" })
+        viewModel.selectedClientID = cbjq.id
+        viewModel.installState = .installed
+        viewModel.installDirectory = "iOS Sandbox/VirtualGameData/cbjq_global"
+        viewModel.currentVersion = cbjq.currentSupportedVersion
+
+        XCTAssertTrue(viewModel.updateRequired)
+        XCTAssertEqual(viewModel.primaryAction, .update)
+
+        await viewModel.runPrimaryAction()
+
+        XCTAssertEqual(viewModel.installState, .installed)
+        XCTAssertEqual(viewModel.currentVersion, cbjq.latestVersion)
+        XCTAssertFalse(viewModel.updateRequired)
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "update: Seasun manifest diff compares local manifest.json paks by hash, removes stale paks, and downloads missing paks via Aria2"
+        })
+        XCTAssertEqual(
+            ChannelClientStore(defaults: defaults).load(for: cbjq.id).virtualInstallMetadata,
+            VirtualInstallMetadata(client: cbjq, gameVersion: cbjq.latestVersion)
+        )
+    }
+
+    @MainActor
     func testPredownloadPromptCanBeDismissed() async {
         let viewModel = makeViewModel()
 

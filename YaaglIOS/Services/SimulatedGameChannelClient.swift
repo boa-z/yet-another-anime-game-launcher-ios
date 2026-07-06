@@ -70,7 +70,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
         case .importExisting:
             nextState = stateAfterImport(currentState: currentState, context: context)
         case .update:
-            if descriptor.updatableVersions.contains(currentState.currentVersion) {
+            if canUpdate(from: currentState.currentVersion) {
                 nextState.currentVersion = descriptor.latestVersion
                 nextState.predownloadedAll = false
                 nextState.predownloadedArchiveKeys = []
@@ -115,7 +115,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
         case .existing(let version, let metadata):
             let detectedVersion = SemanticVersion(version)
             let latestVersion = SemanticVersion(descriptor.latestVersion)
-            guard detectedVersion >= latestVersion || descriptor.updatableVersions.contains(version) else {
+            guard detectedVersion >= latestVersion || canUpdate(from: version) else {
                 return currentState
             }
 
@@ -128,6 +128,14 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 virtualInstallMetadata: metadata ?? VirtualInstallMetadata(client: descriptor, gameVersion: version),
                 predownloadedArchiveKeys: []
             )
+        }
+    }
+
+    private func canUpdate(from version: String) -> Bool {
+        if descriptor.gameType == "cbjq" {
+            SemanticVersion(version) <= SemanticVersion(descriptor.currentSupportedVersion)
+        } else {
+            descriptor.updatableVersions.contains(version)
         }
     }
 }

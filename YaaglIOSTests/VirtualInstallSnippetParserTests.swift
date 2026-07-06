@@ -68,6 +68,25 @@ final class VirtualInstallSnippetParserTests: XCTestCase {
     }
 
     @MainActor
+    func testSeasunManifestJSONParsesProjectVersion() throws {
+        let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "cbjq_global" })
+        let result = parser.parse(
+            """
+            {
+              "version": "2.1.0.83",
+              "projectVersion": "2.1.0",
+              "pathOffset": "assets",
+              "paks": []
+            }
+            """,
+            for: client
+        )
+
+        XCTAssertEqual(result.source, .manifestJSON)
+        XCTAssertEqual(result.detectedVersion, "2.1.0")
+    }
+
+    @MainActor
     func testManifestJSONParsesNestedGameVersion() throws {
         let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hkrpg_global" })
         let result = parser.parse(

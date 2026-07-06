@@ -51,6 +51,27 @@ struct WineDistribution: Identifiable, Hashable, Sendable {
             remoteURL: "https://github.com/3Shain/wine/releases/download/v9.9-mingw/wine.tar.gz",
             renderBackend: "dxmt",
             winePath: nil
+        ),
+        WineDistribution(
+            id: "unstable-bh-wine-1.1",
+            displayName: "Wine unstable BH 1.1",
+            remoteURL: "https://github.com/3Shain/winecx/releases/download/unstable-bh-wine-1.1/wine.tar.gz",
+            renderBackend: "wine",
+            winePath: nil
+        ),
+        WineDistribution(
+            id: "unstable-bh-gptk-1.0",
+            displayName: "Wine unstable BH GPTK 1.0",
+            remoteURL: "https://github.com/3Shain/wine/releases/download/unstable-bh-gptk-1.0/wine.tar.gz",
+            renderBackend: "gptk",
+            winePath: nil
+        ),
+        WineDistribution(
+            id: "v9.2-mingw",
+            displayName: "Wine 9.2 MinGW",
+            remoteURL: "https://github.com/3Shain/wine/releases/download/v9.2-mingw/wine.tar.gz",
+            renderBackend: "wine",
+            winePath: nil
         )
     ]
 

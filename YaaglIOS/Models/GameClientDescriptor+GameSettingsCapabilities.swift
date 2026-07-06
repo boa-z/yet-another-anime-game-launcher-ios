@@ -9,6 +9,8 @@ extension GameClientDescriptor {
             .nap
         case "hkrpg":
             .hkrpg
+        case "cbjq":
+            .cbjq
         default:
             .none
         }

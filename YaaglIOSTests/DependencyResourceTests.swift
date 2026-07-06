@@ -15,6 +15,8 @@ final class DependencyResourceTests: XCTestCase {
         XCTAssertEqual(resources["dxmt"]?.currentVersion, "0.80.0")
         XCTAssertEqual(resources["reshade"]?.installedVersionKey, "installed_reshade")
         XCTAssertEqual(resources["reshade"]?.currentVersion, "5.8.0")
+        XCTAssertNil(resources["media-foundation"]?.installedVersionKey)
+        XCTAssertEqual(resources["media-foundation"]?.currentVersion, "mf-install")
     }
 
     func testCatalogKeepsRemoteURLsAsMetadataOnly() throws {
@@ -34,6 +36,16 @@ final class DependencyResourceTests: XCTestCase {
         )
         XCTAssertTrue(reshade.downloadBlockLog.contains("installed_reshade"))
         XCTAssertTrue(reshade.downloadBlockLog.contains("were not downloaded"))
+    }
+
+    func testMediaFoundationCatalogDoesNotInventDesktopInstalledVersionKey() throws {
+        let mediaFoundation = try XCTUnwrap(DependencyResource.resource(id: "media-foundation"))
+
+        XCTAssertNil(mediaFoundation.installedVersionKey)
+        XCTAssertTrue(mediaFoundation.artifactNames.contains("mfplat.dll"))
+        XCTAssertTrue(mediaFoundation.artifactNames.contains("wmf.reg"))
+        XCTAssertTrue(mediaFoundation.downloadBlockLog.contains("no desktop installed-version key"))
+        XCTAssertTrue(mediaFoundation.iOSAvailabilityNote.contains("regsvr32 calls are disabled"))
     }
 
     func testDXMTArtifactListIncludesDesktopUnixlibBridgeFiles() throws {

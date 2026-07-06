@@ -68,7 +68,7 @@ struct LauncherSimulationService: Sendable {
         case .checkIntegrity:
             checkIntegritySteps(client: client)
         case .initEnvironment:
-            initEnvironmentSteps(requiresPatchRevert: state.requiresPatchRevert, configuration: configuration)
+            initEnvironmentSteps(client: client, requiresPatchRevert: state.requiresPatchRevert, configuration: configuration)
         case .checkLauncherUpdate:
             launcherUpdateSteps(client: client)
         case .settingsQuickAction:
@@ -149,6 +149,8 @@ struct LauncherSimulationService: Sendable {
         switch client.gameType {
         case "hk4e":
             "install: Sophon startInstallation game_type=hk4e install_reltype=\(client.releaseType) is simulated"
+        case "cbjq":
+            "install: Seasun manifest pak download from dlc/pathOffset/hash into manifest-defined files is simulated"
         case "nap":
             "install: Aria2 segmented ZIP download to .ariatmp, concatenation, doStreamUnzip, cleanup, and config.ini write are simulated"
         case "hkrpg":
@@ -164,6 +166,8 @@ struct LauncherSimulationService: Sendable {
         switch client.gameType {
         case "hk4e":
             "install: real Sophon download is disabled on iOS"
+        case "cbjq":
+            "install: real Seasun pak downloads are disabled on iOS"
         default:
             "install: real Aria2 game archive download is disabled on iOS"
         }
@@ -173,9 +177,21 @@ struct LauncherSimulationService: Sendable {
         let ids: [String]
         switch action {
         case .install, .predownload, .checkIntegrity:
-            ids = client.gameType == "hk4e" ? ["sophon-server"] : ["aria2"]
+            if client.gameType == "hk4e" {
+                ids = ["sophon-server"]
+            } else if client.gameType == "cbjq", action == .predownload {
+                ids = []
+            } else {
+                ids = ["aria2"]
+            }
         case .update:
-            ids = client.gameType == "hk4e" ? ["sophon-server"] : ["aria2", "hpatchz"]
+            if client.gameType == "hk4e" {
+                ids = ["sophon-server"]
+            } else if client.gameType == "cbjq" {
+                ids = ["aria2"]
+            } else {
+                ids = ["aria2", "hpatchz"]
+            }
         case .checkLauncherUpdate:
             ids = ["aria2"]
         default:
@@ -201,6 +217,8 @@ struct LauncherSimulationService: Sendable {
         switch client.gameType {
         case "hk4e":
             return "\(action): desktop server metadata \(fields) is represented without running Sophon side effects"
+        case "cbjq":
+            return "\(action): Seasun manifest metadata \(seasunManifestMetadataLog(for: client)) is represented without reading or writing manifest.json"
         case "bh3" where action == "install":
             return "\(action): desktop server metadata \(fields) is retained; BH3 config.ini rewrite is simulated on update"
         default:
@@ -212,6 +230,8 @@ struct LauncherSimulationService: Sendable {
         switch client.gameType {
         case "hk4e":
             "predownload: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=true is simulated"
+        case "cbjq":
+            "predownload: CBJQ desktop pre-download is not implemented; no manifest paks are requested"
         default:
             "predownload: Aria2 archives would download into .ariatmp and set per-archive predownload markers"
         }
@@ -230,6 +250,8 @@ struct LauncherSimulationService: Sendable {
         switch client.gameType {
         case "hk4e":
             "integrity: Sophon startRepair game_type=hk4e repair_mode=reliable is simulated"
+        case "cbjq":
+            "integrity: Seasun manifest paks size/md5 scan and Aria2 repair downloads are simulated"
         default:
             "integrity: pkg_version scan with size/md5 checks and Aria2 repair downloads is simulated"
         }
@@ -272,7 +294,7 @@ struct LauncherSimulationService: Sendable {
         case .existing(let version, let metadata):
             let detectedVersion = SemanticVersion(version)
             let latestVersion = SemanticVersion(client.latestVersion)
-            if detectedVersion < latestVersion && !client.updatableVersions.contains(version) {
+            if detectedVersion < latestVersion && !canUpdate(client: client, from: version) {
                 return [
                     SimulationStep("Reading existing game version", progress: nil),
                     SimulationStep(
@@ -532,6 +554,51 @@ struct LauncherSimulationService: Sendable {
                 progress: 0.23,
                 log: "launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"
             ))
+        case "cbjq":
+            if SemanticVersion(client.latestVersion) > SemanticVersion(client.currentSupportedVersion),
+               !configuration.patchOff {
+                steps.append(SimulationStep(
+                    "Representing unsupported CBJQ launch guard",
+                    progress: 0.2,
+                    log: "launch: CBJQ version \(client.latestVersion) is above desktop supported \(client.currentSupportedVersion); desktop would show unsupported-version alert unless patchOff is enabled"
+                ))
+            }
+            if let jadeite = DependencyResource.resource(id: "jadeite") {
+                steps.append(SimulationStep(
+                    "Blocked Jadeite dependency download",
+                    progress: 0.2,
+                    log: jadeite.downloadBlockLog
+                ))
+            }
+            if let mediaFoundation = DependencyResource.resource(id: "media-foundation") {
+                steps.append(SimulationStep(
+                    "Blocked Media Foundation dependency download",
+                    progress: 0.2,
+                    log: mediaFoundation.downloadBlockLog
+                ))
+            }
+            steps.append(SimulationStep(
+                "Preparing CBJQ command line",
+                progress: 0.21,
+                log: "launch: CBJQ config.bat runs \(client.executable) -FeatureLevelES31 -ChannelID=\(client.server.desktopServerChannel ?? client.releaseType)"
+            ))
+            if let compatibilityNote = client.server.compatibilityNote {
+                steps.append(SimulationStep(
+                    "Representing CBJQ compatibility note",
+                    progress: 0.21,
+                    log: "launch: \(compatibilityNote)"
+                ))
+            }
+            steps.append(SimulationStep(
+                "Applying MoltenVK compatibility",
+                progress: 0.22,
+                log: "launch: MVK_ALLOW_METAL_FENCES=1"
+            ))
+            steps.append(SimulationStep(
+                "Applying DLL overrides",
+                progress: 0.23,
+                log: "launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"
+            ))
         default:
             break
         }
@@ -584,6 +651,8 @@ struct LauncherSimulationService: Sendable {
             "launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60;dxgi.customVendorId=10de;dxgi.customDeviceId=2684; DXMT_ENABLE_NVEXT=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         case "nap":
             "launch: WINEMSYNC=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
+        case "cbjq":
+            "launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         default:
             "launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         }
@@ -720,7 +789,7 @@ struct LauncherSimulationService: Sendable {
     }
 
     private func updateSteps(client: GameClientDescriptor, state: ChannelClientState) -> [SimulationStep] {
-        guard client.updatableVersions.contains(state.currentVersion) else {
+        guard canUpdate(client: client, from: state.currentVersion) else {
             return [
                 SimulationStep("Checking update compatibility", progress: nil),
                 SimulationStep(
@@ -761,6 +830,8 @@ struct LauncherSimulationService: Sendable {
         switch client.gameType {
         case "hk4e":
             "update: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=false is simulated"
+        case "cbjq":
+            "update: Seasun manifest diff compares local manifest.json paks by hash, removes stale paks, and downloads missing paks via Aria2"
         case "hkrpg":
             "update: Aria2 patch archive download to .ariatmp, extract7z, deletefiles.txt, hdiffmap.json, hpatchz, and audio package patches are simulated"
         case "nap":
@@ -776,6 +847,8 @@ struct LauncherSimulationService: Sendable {
         switch client.gameType {
         case "hk4e":
             "update: Sophon diff/chunk downloads and game package writes are disabled"
+        case "cbjq":
+            "update: Seasun pak downloads and manifest.json writes are disabled"
         default:
             "update: Aria2 patch archive downloads and game package writes are disabled"
         }
@@ -785,6 +858,8 @@ struct LauncherSimulationService: Sendable {
         switch client.gameType {
         case "hk4e":
             "update: Sophon delete_file, ldiff_download_complete, chunk_progress, and delete_ldiff_file events are simulated"
+        case "cbjq":
+            "update: stale pak removal, manifest.json rewrite, and patched marker clear are simulated"
         case "hkrpg":
             "update: extract7z output, deletefiles.txt cleanup, and hdiffmap.json patch map are simulated"
         default:
@@ -793,6 +868,7 @@ struct LauncherSimulationService: Sendable {
     }
 
     private func initEnvironmentSteps(
+        client: GameClientDescriptor,
         requiresPatchRevert: Bool,
         configuration: LauncherConfigurationSnapshot
     ) -> [SimulationStep] {
@@ -810,7 +886,19 @@ struct LauncherSimulationService: Sendable {
                     "Blocked Wine distribution download",
                     progress: 0.38,
                     log: "wine update: remote archive \(pendingWineUpdate.remoteURL) was not requested"
-                ),
+                )
+            ])
+
+            if requiresMediaFoundation(for: client),
+               let mediaFoundation = DependencyResource.resource(id: "media-foundation") {
+                steps.append(SimulationStep(
+                    "Blocked Media Foundation install",
+                    progress: 0.48,
+                    log: mediaFoundation.downloadBlockLog
+                ))
+            }
+
+            steps.append(contentsOf: [
                 SimulationStep(
                     "Skipping Wine install side effects",
                     progress: 0.56,
@@ -861,6 +949,26 @@ struct LauncherSimulationService: Sendable {
             let remoteURL = configuration.wineUpdateURL.isEmpty ? "unknown remote archive" : configuration.wineUpdateURL
             return ("unknown Wine distribution \(pendingID)", remoteURL)
         }
+    }
+
+    private func canUpdate(client: GameClientDescriptor, from version: String) -> Bool {
+        if client.gameType == "cbjq" {
+            SemanticVersion(version) <= SemanticVersion(client.currentSupportedVersion)
+        } else {
+            client.updatableVersions.contains(version)
+        }
+    }
+
+    private func requiresMediaFoundation(for client: GameClientDescriptor) -> Bool {
+        client.gameType == "bh3" || client.gameType == "cbjq"
+    }
+
+    private func seasunManifestMetadataLog(for client: GameClientDescriptor) -> String {
+        let manifestSummary = client.server.manifestSummary ?? "manifest metadata unavailable"
+        let projectVersion = " projectVersion=\(client.latestVersion)"
+        let channel = client.server.desktopServerChannel.map { " channel=\($0)" } ?? ""
+        let compatibility = client.server.compatibilityNote.map { " note=\($0)" } ?? ""
+        return "\(manifestSummary)\(projectVersion)\(channel)\(compatibility)"
     }
 }
 

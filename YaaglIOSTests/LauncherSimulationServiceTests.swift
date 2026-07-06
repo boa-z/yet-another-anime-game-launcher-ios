@@ -437,6 +437,90 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertFalse(logs.contains { $0.contains("HDR registry") })
     }
 
+    @MainActor
+    func testCBJQTracesMatchSeasunManifestPipelines() async throws {
+        let service = LauncherSimulationService(stepDurationMilliseconds: 0)
+        let cbjq = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "cbjq_global" })
+        let cbjqCN = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "cbjq_cn" })
+        let directory = "iOS Sandbox/VirtualGameData/cbjq_global"
+
+        let installLogs = try await logs(
+            service.makeProgram(
+                action: .install,
+                client: cbjq,
+                configuration: launchSnapshot(),
+                installDirectory: directory,
+                state: .empty
+            )
+        )
+        XCTAssertTrue(installLogs.contains("install: Seasun manifest pak download from dlc/pathOffset/hash into manifest-defined files is simulated"))
+        XCTAssertTrue(installLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
+        XCTAssertTrue(installLogs.contains("install: real Seasun pak downloads are disabled on iOS"))
+        XCTAssertTrue(installLogs.contains {
+            $0.contains("install: Seasun manifest metadata") &&
+                $0.contains("projectVersion=2.1.0") &&
+                $0.contains("version=2.1.0.83") &&
+                $0.contains("pathOffset=assets") &&
+                $0.contains("paks=1473") &&
+                $0.contains("channel=seasun")
+        })
+
+        let updateLogs = try await logs(
+            service.makeProgram(
+                action: .update,
+                client: cbjq,
+                configuration: launchSnapshot(),
+                installDirectory: directory,
+                state: installedState(for: cbjq, at: directory, currentVersion: "2.0.0")
+            )
+        )
+        XCTAssertTrue(updateLogs.contains("update: Seasun manifest diff compares local manifest.json paks by hash, removes stale paks, and downloads missing paks via Aria2"))
+        XCTAssertTrue(updateLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
+        XCTAssertFalse(updateLogs.contains { $0.contains("hpatchz") })
+        XCTAssertTrue(updateLogs.contains("update: Seasun pak downloads and manifest.json writes are disabled"))
+        XCTAssertTrue(updateLogs.contains("update: stale pak removal, manifest.json rewrite, and patched marker clear are simulated"))
+
+        let launchLogs = try await logs(
+            service.makeProgram(
+                action: .launch,
+                client: cbjq,
+                configuration: launchSnapshot(
+                    reshade: true,
+                    patchOff: false,
+                    wineDistro: "11.0-dxmt-signed-with-patches"
+                ),
+                installDirectory: directory,
+                state: installedState(for: cbjq, at: directory)
+            )
+        )
+        XCTAssertTrue(launchLogs.contains("launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert unless patchOff is enabled"))
+        XCTAssertTrue(launchLogs.contains("dependency: Jadeite 4.1.0 metadata mirrors installed_jadeite_version; v4.1.0.zip were not downloaded"))
+        XCTAssertTrue(launchLogs.contains {
+            $0.contains("dependency: Media Foundation mf-install metadata has no desktop installed-version key") &&
+                $0.contains("mfplat.dll") &&
+                $0.contains("wmf.reg")
+        })
+        XCTAssertTrue(launchLogs.contains("launch: CBJQ config.bat runs Game/Binaries/Win64/Game.exe -FeatureLevelES31 -ChannelID=seasun"))
+        XCTAssertTrue(launchLogs.contains("dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"))
+        XCTAssertTrue(launchLogs.contains("launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
+        XCTAssertTrue(launchLogs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
+        XCTAssertTrue(launchLogs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
+        XCTAssertTrue(launchLogs.contains("launch: would execute cmd /c config.bat for Game/Binaries/Win64/Game.exe"))
+
+        let cnLaunchLogs = try await logs(
+            service.makeProgram(
+                action: .launch,
+                client: cbjqCN,
+                configuration: launchSnapshot(patchOff: true, wineDistro: "v9.2-mingw"),
+                installDirectory: "iOS Sandbox/VirtualGameData/cbjq_cn",
+                state: installedState(for: cbjqCN, at: "iOS Sandbox/VirtualGameData/cbjq_cn")
+            )
+        )
+        XCTAssertTrue(cnLaunchLogs.contains("launch: CBJQ config.bat runs Game/Binaries/Win64/Game.exe -FeatureLevelES31 -ChannelID=jinshan"))
+        XCTAssertTrue(cnLaunchLogs.contains("launch: desktop source marks this channel as broken due to AntiCheat"))
+        XCTAssertFalse(cnLaunchLogs.contains { $0.contains("DXMT_CONFIG") })
+    }
+
     private func collect(_ program: CommonUpdateProgram) async throws -> [CapturedCommand] {
         var commands = [CapturedCommand]()
         for try await command in program {
