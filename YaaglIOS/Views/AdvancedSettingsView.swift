@@ -32,6 +32,13 @@ struct AdvancedSettingsView: View {
                 LabeledContent("Desktop Path", value: resource.desktopInstallPath)
             }
         }
+
+        Section("Desktop Sidecar Metadata") {
+            ForEach(DesktopSidecarTool.catalog) { tool in
+                LabeledContent(tool.displayName, value: tool.settingsSummary)
+                LabeledContent("Desktop Path", value: tool.desktopExecutablePath)
+            }
+        }
     }
 }
 

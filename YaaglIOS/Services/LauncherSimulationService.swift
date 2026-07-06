@@ -80,6 +80,7 @@ struct LauncherSimulationService: Sendable {
         [
             SimulationStep("Allocating files on disk", progress: nil, log: "install: target \(installDirectory)"),
             SimulationStep("Preparing desktop install pipeline", progress: 0.12, log: installPipelineLog(for: client)),
+            SimulationStep("Blocked desktop sidecar execution", progress: 0.16, log: sidecarBlockLog(for: client, action: .install)),
             SimulationStep("Blocked game resource download for \(client.shortTitle)", progress: 0.18, log: installDownloadBlockLog(for: client)),
             SimulationStep("Writing desktop metadata", progress: 0.42, log: desktopConfigMetadataLog(for: client, version: client.latestVersion, action: "install")),
             SimulationStep("Creating virtual installation record", progress: 0.62, log: "install: config.ini/package version writes are represented by UserDefaults only"),
@@ -91,6 +92,7 @@ struct LauncherSimulationService: Sendable {
     private func predownloadSteps(client: GameClientDescriptor) -> [SimulationStep] {
         [
             SimulationStep("Allocating files on disk", progress: nil, log: predownloadPipelineLog(for: client)),
+            SimulationStep("Blocked desktop sidecar execution", progress: 0.25, log: sidecarBlockLog(for: client, action: .predownload)),
             SimulationStep("Blocked pre-download payload", progress: 0.35, log: "predownload: no game archive, diff, voice pack, or Sophon manifest was requested"),
             SimulationStep("Saving archive markers", progress: 0.62, log: predownloadArchiveMarkerLog(for: client)),
             SimulationStep("Saving pre-download marker", progress: 0.78, log: "predownload: predownloaded_all marker is simulated"),
@@ -103,6 +105,7 @@ struct LauncherSimulationService: Sendable {
             SimulationStep("Checking game file integrity. Completed files 0/6", progress: 0.0, log: integrityPipelineLog(for: client)),
             SimulationStep("Checking game file integrity. Completed files 2/6", progress: 0.33),
             SimulationStep("Checking game file integrity. Completed files 4/6", progress: 0.66),
+            SimulationStep("Blocked desktop sidecar execution", progress: 0.72, log: sidecarBlockLog(for: client, action: .checkIntegrity)),
             SimulationStep(
                 "Blocked file repair download",
                 progress: 0.84,
@@ -128,6 +131,11 @@ struct LauncherSimulationService: Sendable {
                 "Blocked launcher update download",
                 progress: 0.58,
                 log: "launcher update: \(blockedAssets) were not downloaded"
+            ),
+            SimulationStep(
+                "Blocked desktop sidecar execution",
+                progress: 0.72,
+                log: DesktopSidecarTool.blockLog(ids: ["aria2"])
             ),
             SimulationStep(
                 "Launcher update simulation complete",
@@ -159,6 +167,22 @@ struct LauncherSimulationService: Sendable {
         default:
             "install: real Aria2 game archive download is disabled on iOS"
         }
+    }
+
+    private func sidecarBlockLog(for client: GameClientDescriptor, action: LauncherAction) -> String {
+        let ids: [String]
+        switch action {
+        case .install, .predownload, .checkIntegrity:
+            ids = client.gameType == "hk4e" ? ["sophon-server"] : ["aria2"]
+        case .update:
+            ids = client.gameType == "hk4e" ? ["sophon-server"] : ["aria2", "hpatchz"]
+        case .checkLauncherUpdate:
+            ids = ["aria2"]
+        default:
+            ids = []
+        }
+
+        return DesktopSidecarTool.blockLog(ids: ids)
     }
 
     private func desktopConfigMetadataLog(
@@ -466,6 +490,13 @@ struct LauncherSimulationService: Sendable {
                 progress: 0.21,
                 log: webviewCleanupPlanLog(for: client)
             ))
+            if let jadeite = DependencyResource.resource(id: "jadeite") {
+                steps.append(SimulationStep(
+                    "Blocked Jadeite dependency download",
+                    progress: 0.22,
+                    log: jadeite.downloadBlockLog
+                ))
+            }
             steps.append(SimulationStep(
                 "Preparing Jadeite launch wrapper",
                 progress: 0.22,
@@ -479,6 +510,13 @@ struct LauncherSimulationService: Sendable {
                 ))
             }
         case "bh3":
+            if let jadeite = DependencyResource.resource(id: "jadeite") {
+                steps.append(SimulationStep(
+                    "Blocked Jadeite dependency download",
+                    progress: 0.2,
+                    log: jadeite.downloadBlockLog
+                ))
+            }
             steps.append(SimulationStep(
                 "Preparing Jadeite launch wrapper",
                 progress: 0.21,
@@ -499,6 +537,13 @@ struct LauncherSimulationService: Sendable {
         }
 
         if wineDistribution?.renderBackend == "dxmt" {
+            if let dxmt = DependencyResource.resource(id: "dxmt") {
+                steps.append(SimulationStep(
+                    "Blocked DXMT dependency download",
+                    progress: 0.23,
+                    log: dxmt.downloadBlockLog
+                ))
+            }
             steps.append(SimulationStep(
                 "Applying DXMT environment",
                 progress: 0.23,
@@ -690,6 +735,7 @@ struct LauncherSimulationService: Sendable {
         return [
             SimulationStep("Updating", progress: nil, log: "update: \(state.currentVersion) -> \(client.latestVersion)"),
             SimulationStep("Preparing desktop update pipeline", progress: 0.12, log: updatePipelineLog(for: client)),
+            SimulationStep("Blocked desktop sidecar execution", progress: 0.18, log: sidecarBlockLog(for: client, action: .update)),
             SimulationStep("Blocked incremental patch download", progress: 0.22, log: updateDownloadBlockLog(for: client)),
             SimulationStep("Simulating patch application", progress: 0.58, log: updatePatchApplicationLog(for: client)),
             SimulationStep("Rewriting desktop metadata", progress: 0.72, log: desktopConfigMetadataLog(for: client, version: client.latestVersion, action: "update")),

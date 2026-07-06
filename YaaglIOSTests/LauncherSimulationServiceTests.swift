@@ -58,6 +58,9 @@ final class LauncherSimulationServiceTests: XCTestCase {
         })
         XCTAssertTrue(logs.contains("launch: wine_netbiosname=DESKTOP-IOS0000 is simulated"))
         XCTAssertTrue(logs.contains("launch: HK4E Steam path bypasses config.bat cloud flags"))
+        let dxmtBlockLog = "dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; " +
+            "dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"
+        XCTAssertTrue(logs.contains(dxmtBlockLog))
         XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(logs.contains("launch: MTL_HUD_ENABLED=1"))
         XCTAssertTrue(logs.contains("launch: Wine Mac Driver RetinaMode=y is simulated"))
@@ -170,9 +173,11 @@ final class LauncherSimulationServiceTests: XCTestCase {
         )
 
         XCTAssertTrue(hk4eLogs.contains("install: Sophon startInstallation game_type=hk4e install_reltype=cn is simulated"))
+        XCTAssertTrue(hk4eLogs.contains("sidecar: Sophon server metadata mirrors ./sidecar/sophon_server/sophon-server; HK4E install, HK4E update, HK4E pre-download, HK4E integrity repair are not bundled or executed on iOS"))
         XCTAssertTrue(hk4eLogs.contains("install: real Sophon download is disabled on iOS"))
         XCTAssertTrue(hk4eLogs.contains("install: desktop server metadata game_version=5.3.0 channel=1 sub_channel=1 cps=<CN_CPS> is represented without running Sophon side effects"))
         XCTAssertTrue(napLogs.contains("install: Aria2 segmented ZIP download to .ariatmp, concatenation, doStreamUnzip, cleanup, and config.ini write are simulated"))
+        XCTAssertTrue(napLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
         XCTAssertTrue(napLogs.contains("install: config.ini [General] game_version=3.0.0 channel=1 sub_channel=0 cps=<NAP_CPS> is simulated"))
         XCTAssertTrue(hkrpgLogs.contains("install: Aria2 segmented 7z download to .ariatmp, doStreamUn7z, cleanup, and config.ini write are simulated"))
         XCTAssertTrue(bh3Logs.contains("install: Aria2 game.7z download to .ariatmp, extract7z, and config.ini write are simulated"))
@@ -209,6 +214,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
 
         XCTAssertTrue(hk4eLogs.contains("update: 5.2.0 -> 5.3.0"))
         XCTAssertTrue(hk4eLogs.contains("update: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=false is simulated"))
+        XCTAssertTrue(hk4eLogs.contains("sidecar: Sophon server metadata mirrors ./sidecar/sophon_server/sophon-server; HK4E install, HK4E update, HK4E pre-download, HK4E integrity repair are not bundled or executed on iOS"))
         XCTAssertTrue(hk4eLogs.contains("update: Sophon diff/chunk downloads and game package writes are disabled"))
         XCTAssertTrue(hk4eLogs.contains("update: Sophon delete_file, ldiff_download_complete, chunk_progress, and delete_ldiff_file events are simulated"))
         XCTAssertTrue(hk4eLogs.contains("update: desktop server metadata game_version=5.3.0 channel=1 sub_channel=1 cps=<CN_CPS> is represented without running Sophon side effects"))
@@ -216,6 +222,10 @@ final class LauncherSimulationServiceTests: XCTestCase {
 
         XCTAssertTrue(hkrpgLogs.contains("update: 4.2.0 -> 4.3.0"))
         XCTAssertTrue(hkrpgLogs.contains("update: Aria2 patch archive download to .ariatmp, extract7z, deletefiles.txt, hdiffmap.json, hpatchz, and audio package patches are simulated"))
+        XCTAssertTrue(hkrpgLogs.contains {
+            $0.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c") &&
+                $0.contains("sidecar: hpatchz metadata mirrors ./sidecar/hpatchz/hpatchz")
+        })
         XCTAssertTrue(hkrpgLogs.contains("update: Aria2 patch archive downloads and game package writes are disabled"))
         XCTAssertTrue(hkrpgLogs.contains("update: extract7z output, deletefiles.txt cleanup, and hdiffmap.json patch map are simulated"))
         XCTAssertTrue(hkrpgLogs.contains("update: config.ini [General] game_version=4.3.0 channel=1 sub_channel=1 cps=<HKRPG_OS_CPS> is simulated"))
@@ -267,13 +277,17 @@ final class LauncherSimulationServiceTests: XCTestCase {
         )
 
         XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=true is simulated"))
+        XCTAssertTrue(hk4ePredownloadLogs.contains("sidecar: Sophon server metadata mirrors ./sidecar/sophon_server/sophon-server; HK4E install, HK4E update, HK4E pre-download, HK4E integrity repair are not bundled or executed on iOS"))
         XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: no game archive, diff, voice pack, or Sophon manifest was requested"))
         XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: hk4e pipeline does not use per-archive marker keys"))
         XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: predownloaded_all marker is simulated"))
         XCTAssertTrue(napIntegrityLogs.contains("integrity: pkg_version scan with size/md5 checks and Aria2 repair downloads is simulated"))
+        XCTAssertTrue(napIntegrityLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
         XCTAssertTrue(hk4eIntegrityLogs.contains("integrity: Sophon startRepair game_type=hk4e repair_mode=reliable is simulated"))
+        XCTAssertTrue(hk4eIntegrityLogs.contains("sidecar: Sophon server metadata mirrors ./sidecar/sophon_server/sophon-server; HK4E install, HK4E update, HK4E pre-download, HK4E integrity repair are not bundled or executed on iOS"))
         XCTAssertTrue(launcherUpdateLogs.contains("launcher update: GitHub latest release lookup for bh3glb is simulated"))
         XCTAssertTrue(launcherUpdateLogs.contains("launcher update: resources_bh3glb.neu and Yaagl.Honkai.Global.app.tar.gz were not downloaded"))
+        XCTAssertTrue(launcherUpdateLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
         XCTAssertTrue(launcherUpdateLogs.contains("launcher update: resources.neu was not replaced"))
     }
 
@@ -318,6 +332,8 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let logs = commands.compactMap(\.log)
 
         XCTAssertTrue(logs.contains("launch: full patch payload set is simulated"))
+        XCTAssertTrue(logs.contains("dependency: Jadeite 4.1.0 metadata mirrors installed_jadeite_version; v4.1.0.zip were not downloaded"))
+        XCTAssertTrue(logs.contains("dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"))
         XCTAssertTrue(logs.contains("launch: jadeite.exe wraps BH3.exe"))
         XCTAssertTrue(logs.contains("launch: desktop removed-file patch plan moves BH3_Data/Plugins/crashreport.exe, BH3_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
         XCTAssertTrue(logs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
@@ -408,8 +424,10 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let logs = commands.compactMap(\.log)
 
         XCTAssertTrue(logs.contains("launch: HKRPG WebView cleanup HKEY_CURRENT_USER\\Software\\Cognosphere\\Star Rail removes MIHOYOSDK_WEBVIEW_RENDER_METHOD_h1573598267 and HOYO_WEBVIEW_RENDER_METHOD_ABTEST_*"))
+        XCTAssertTrue(logs.contains("dependency: Jadeite 4.1.0 metadata mirrors installed_jadeite_version; v4.1.0.zip were not downloaded"))
         XCTAssertTrue(logs.contains("launch: jadeite.exe wraps StarRail.exe -- -disable-gpu-skinning"))
         XCTAssertTrue(logs.contains("launch: HKRPG NVIDIA extension registry writes are simulated"))
+        XCTAssertTrue(logs.contains("dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"))
         XCTAssertTrue(logs.contains("launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60;dxgi.customVendorId=10de;dxgi.customDeviceId=2684; DXMT_ENABLE_NVEXT=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(logs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 globaldp-prod-os01.starrails.com for 15s"))
         XCTAssertTrue(logs.contains("launch: HTTP_PROXY=127.0.0.1:8080; HTTPS_PROXY=127.0.0.1:8080"))
