@@ -428,6 +428,44 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testPredownloadPersistsPerArchiveMarkersForAria2Clients() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let nap = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "nap_global" })
+        let viewModel = LauncherViewModel(
+            defaults: defaults,
+            channelClients: [
+                SimulatedGameChannelClient(
+                    descriptor: nap,
+                    simulationService: LauncherSimulationService(stepDurationMilliseconds: 0)
+                )
+            ]
+        )
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "iOS Sandbox/VirtualGameData/nap_global",
+                currentVersion: nap.latestVersion,
+                predownloadedAll: false,
+                requiresPatchRevert: false
+            ),
+            for: nap.id
+        )
+
+        await viewModel.predownload()
+
+        let expectedKeys = PredownloadArchiveMarker.markers(for: nap).map(\.key).sorted()
+        let savedState = store.load(for: nap.id)
+
+        XCTAssertTrue(savedState.predownloadedAll)
+        XCTAssertEqual(savedState.predownloadedArchiveKeys, expectedKeys)
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message.contains("predownload: per-archive marker keys")
+        })
+    }
+
+    @MainActor
     func testZeroProgressIsDisplayedAsIndeterminate() async {
         let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
         let viewModel = LauncherViewModel(

@@ -90,6 +90,7 @@ struct LauncherSimulationService: Sendable {
         [
             SimulationStep("Allocating files on disk", progress: nil, log: predownloadPipelineLog(for: client)),
             SimulationStep("Blocked pre-download payload", progress: 0.35, log: "predownload: no game archive, diff, voice pack, or Sophon manifest was requested"),
+            SimulationStep("Saving archive markers", progress: 0.62, log: predownloadArchiveMarkerLog(for: client)),
             SimulationStep("Saving pre-download marker", progress: 0.78, log: "predownload: predownloaded_all marker is simulated"),
             SimulationStep("Pre-download simulation complete", progress: 1.0)
         ]
@@ -184,6 +185,15 @@ struct LauncherSimulationService: Sendable {
         default:
             "predownload: Aria2 archives would download into .ariatmp and set per-archive predownload markers"
         }
+    }
+
+    private func predownloadArchiveMarkerLog(for client: GameClientDescriptor) -> String {
+        let markerKeys = PredownloadArchiveMarker.markers(for: client).map(\.key)
+        guard !markerKeys.isEmpty else {
+            return "predownload: \(client.gameType) pipeline does not use per-archive marker keys"
+        }
+
+        return "predownload: per-archive marker keys \(markerKeys.joined(separator: ", ")) are simulated from archive basenames"
     }
 
     private func integrityPipelineLog(for client: GameClientDescriptor) -> String {
@@ -669,11 +679,19 @@ struct LauncherSimulationService: Sendable {
             SimulationStep(
                 "Clearing pre-download marker",
                 progress: 0.84,
-                log: "update: predownloaded_all and per-archive predownload markers would be cleared",
+                log: updatePredownloadMarkerClearLog(for: state),
                 virtualPatchState: false
             ),
             SimulationStep("Update simulation complete", progress: 1.0)
         ]
+    }
+
+    private func updatePredownloadMarkerClearLog(for state: ChannelClientState) -> String {
+        guard !state.predownloadedArchiveKeys.isEmpty else {
+            return "update: predownloaded_all and per-archive predownload markers would be cleared"
+        }
+
+        return "update: predownloaded_all and per-archive predownload markers would be cleared (\(state.predownloadedArchiveKeys.joined(separator: ", ")))"
     }
 
     private func updatePipelineLog(for client: GameClientDescriptor) -> String {

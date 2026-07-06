@@ -17,7 +17,11 @@ final class ChannelClientStoreTests: XCTestCase {
                 subchannelID: 1,
                 cpsReference: "CN_CPS",
                 sourceServerID: "hk4e_cn"
-            )
+            ),
+            predownloadedArchiveKeys: [
+                "predownloaded_game",
+                "predownloaded_voice"
+            ]
         )
         let secondState = ChannelClientState(
             installState: .installed,
@@ -32,6 +36,8 @@ final class ChannelClientStoreTests: XCTestCase {
 
         XCTAssertEqual(store.load(for: "hk4e_cn"), firstState)
         XCTAssertEqual(store.load(for: "hkrpg_cn"), secondState)
+        XCTAssertTrue(store.load(for: "hk4e_cn").predownloadedArchiveKeys.contains("predownloaded_game"))
+        XCTAssertTrue(store.load(for: "hk4e_cn").predownloadedArchiveKeys.contains("predownloaded_voice"))
     }
 
     @MainActor
@@ -47,6 +53,7 @@ final class ChannelClientStoreTests: XCTestCase {
         XCTAssertEqual(state.installDirectory, "iOS Sandbox/VirtualGameData/hk4e_cn")
         XCTAssertEqual(state.currentVersion, "5.3.0")
         XCTAssertNil(state.virtualInstallMetadata)
+        XCTAssertEqual(state.predownloadedArchiveKeys, [])
     }
 
     @MainActor
@@ -57,7 +64,8 @@ final class ChannelClientStoreTests: XCTestCase {
             installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
             currentVersion: "5.3.0",
             predownloadedAll: true,
-            requiresPatchRevert: true
+            requiresPatchRevert: true,
+            predownloadedArchiveKeys: ["predownloaded_game"]
         )
 
         store.save(savedState, for: "hk4e_cn")
@@ -66,6 +74,7 @@ final class ChannelClientStoreTests: XCTestCase {
 
         XCTAssertEqual(store.load(for: "hk4e_cn"), .empty)
         XCTAssertEqual(store.load(for: "hkrpg_cn"), savedState)
+        XCTAssertFalse(store.load(for: "hk4e_cn").predownloadedArchiveKeys.contains("predownloaded_game"))
     }
 
     @MainActor

@@ -64,6 +64,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
             nextState.installDirectory = context.installDirectory.isEmpty ? virtualInstallDirectory() : context.installDirectory
             nextState.currentVersion = descriptor.latestVersion
             nextState.predownloadedAll = false
+            nextState.predownloadedArchiveKeys = []
             nextState.requiresPatchRevert = false
             nextState.virtualInstallMetadata = VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion)
         case .importExisting:
@@ -72,6 +73,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
             if descriptor.updatableVersions.contains(currentState.currentVersion) {
                 nextState.currentVersion = descriptor.latestVersion
                 nextState.predownloadedAll = false
+                nextState.predownloadedArchiveKeys = []
                 nextState.requiresPatchRevert = false
                 nextState.virtualInstallMetadata = VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion)
             } else {
@@ -79,6 +81,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
             }
         case .predownload:
             nextState.predownloadedAll = true
+            nextState.predownloadedArchiveKeys = PredownloadArchiveMarker.markers(for: descriptor).map(\.key).sorted()
         case .launch, .checkIntegrity, .initEnvironment:
             nextState.requiresPatchRevert = false
         case .checkLauncherUpdate:
@@ -104,7 +107,8 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 currentVersion: descriptor.latestVersion,
                 predownloadedAll: false,
                 requiresPatchRevert: false,
-                virtualInstallMetadata: VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion)
+                virtualInstallMetadata: VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion),
+                predownloadedArchiveKeys: []
             )
         case .unreadable:
             return currentState
@@ -121,7 +125,8 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 currentVersion: version,
                 predownloadedAll: false,
                 requiresPatchRevert: false,
-                virtualInstallMetadata: metadata ?? VirtualInstallMetadata(client: descriptor, gameVersion: version)
+                virtualInstallMetadata: metadata ?? VirtualInstallMetadata(client: descriptor, gameVersion: version),
+                predownloadedArchiveKeys: []
             )
         }
     }

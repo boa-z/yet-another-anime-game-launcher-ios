@@ -15,7 +15,8 @@ struct ChannelClientStore {
             currentVersion: defaults.string(forKey: currentVersionKey(for: clientID)) ?? "0.0.0",
             predownloadedAll: defaults.bool(forKey: predownloadedAllKey(for: clientID)),
             requiresPatchRevert: defaults.bool(forKey: requiresPatchRevertKey(for: clientID)),
-            virtualInstallMetadata: virtualInstallMetadata(for: clientID)
+            virtualInstallMetadata: virtualInstallMetadata(for: clientID),
+            predownloadedArchiveKeys: predownloadedArchiveKeys(for: clientID)
         )
     }
 
@@ -26,6 +27,7 @@ struct ChannelClientStore {
         defaults.set(state.predownloadedAll, forKey: predownloadedAllKey(for: clientID))
         defaults.set(state.requiresPatchRevert, forKey: requiresPatchRevertKey(for: clientID))
         saveVirtualInstallMetadata(state.virtualInstallMetadata, for: clientID)
+        savePredownloadedArchiveKeys(state.predownloadedArchiveKeys, for: clientID)
     }
 
     func clear(for clientID: String) {
@@ -35,6 +37,45 @@ struct ChannelClientStore {
         defaults.removeObject(forKey: predownloadedAllKey(for: clientID))
         defaults.removeObject(forKey: requiresPatchRevertKey(for: clientID))
         removeVirtualInstallMetadata(for: clientID)
+        removePredownloadedArchiveKeys(for: clientID)
+    }
+
+    private func predownloadedArchiveKeys(for clientID: String) -> [String] {
+        let keys = defaults.stringArray(forKey: predownloadedArchiveIndexKey(for: clientID)) ?? []
+
+        return keys.filter { key in
+            defaults.bool(forKey: predownloadedArchiveFlagKey(key, for: clientID))
+        }
+    }
+
+    private func savePredownloadedArchiveKeys(_ keys: [String], for clientID: String) {
+        removePredownloadedArchiveKeys(for: clientID)
+
+        let normalizedKeys = normalizedPredownloadedArchiveKeys(keys)
+        guard !normalizedKeys.isEmpty else {
+            return
+        }
+
+        defaults.set(normalizedKeys, forKey: predownloadedArchiveIndexKey(for: clientID))
+        for key in normalizedKeys {
+            defaults.set(true, forKey: predownloadedArchiveFlagKey(key, for: clientID))
+        }
+    }
+
+    private func removePredownloadedArchiveKeys(for clientID: String) {
+        let keys = defaults.stringArray(forKey: predownloadedArchiveIndexKey(for: clientID)) ?? []
+        for key in keys {
+            defaults.removeObject(forKey: predownloadedArchiveFlagKey(key, for: clientID))
+        }
+        defaults.removeObject(forKey: predownloadedArchiveIndexKey(for: clientID))
+    }
+
+    private func normalizedPredownloadedArchiveKeys(_ keys: [String]) -> [String] {
+        var seen = Set<String>()
+
+        return keys
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+            .sorted()
     }
 
     private func virtualInstallMetadata(for clientID: String) -> VirtualInstallMetadata? {
@@ -91,6 +132,14 @@ struct ChannelClientStore {
 
     private func predownloadedAllKey(for clientID: String) -> String {
         "client.\(clientID).predownloaded_all"
+    }
+
+    private func predownloadedArchiveIndexKey(for clientID: String) -> String {
+        "client.\(clientID).predownload_archive_keys"
+    }
+
+    private func predownloadedArchiveFlagKey(_ archiveKey: String, for clientID: String) -> String {
+        "client.\(clientID).\(archiveKey)"
     }
 
     private func requiresPatchRevertKey(for clientID: String) -> String {

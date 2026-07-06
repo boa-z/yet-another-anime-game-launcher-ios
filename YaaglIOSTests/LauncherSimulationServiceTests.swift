@@ -259,6 +259,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
 
         XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=true is simulated"))
         XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: no game archive, diff, voice pack, or Sophon manifest was requested"))
+        XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: hk4e pipeline does not use per-archive marker keys"))
         XCTAssertTrue(hk4ePredownloadLogs.contains("predownload: predownloaded_all marker is simulated"))
         XCTAssertTrue(napIntegrityLogs.contains("integrity: pkg_version scan with size/md5 checks and Aria2 repair downloads is simulated"))
         XCTAssertTrue(hk4eIntegrityLogs.contains("integrity: Sophon startRepair game_type=hk4e repair_mode=reliable is simulated"))

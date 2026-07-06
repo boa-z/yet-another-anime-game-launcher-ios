@@ -377,7 +377,8 @@ final class LauncherViewModel {
             currentVersion: currentVersion,
             predownloadedAll: persistedState.predownloadedAll,
             requiresPatchRevert: persistedState.requiresPatchRevert,
-            virtualInstallMetadata: persistedState.virtualInstallMetadata
+            virtualInstallMetadata: persistedState.virtualInstallMetadata,
+            predownloadedArchiveKeys: persistedState.predownloadedArchiveKeys
         )
     }
 

@@ -7,6 +7,7 @@ struct ChannelClientState: Equatable, Sendable {
     var predownloadedAll: Bool
     var requiresPatchRevert: Bool
     var virtualInstallMetadata: VirtualInstallMetadata? = nil
+    var predownloadedArchiveKeys: [String] = []
 
     static let empty = ChannelClientState(
         installState: .notInstalled,
@@ -14,6 +15,7 @@ struct ChannelClientState: Equatable, Sendable {
         currentVersion: "0.0.0",
         predownloadedAll: false,
         requiresPatchRevert: false,
-        virtualInstallMetadata: nil
+        virtualInstallMetadata: nil,
+        predownloadedArchiveKeys: []
     )
 }
