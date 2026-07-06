@@ -48,18 +48,20 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch dir: iOS Sandbox/VirtualGameData/hk4e_cn"))
         XCTAssertTrue(logs.contains("launch: workaround3 skips tagged patch payloads"))
         XCTAssertTrue(logs.contains("launch: Wine distro Wine 11.0 DXMT (signed, with patches) (11.0-dxmt-signed-with-patches) is simulated only"))
-        XCTAssertTrue(logs.contains("launch: HK4E args -platform_type CLOUD_THIRD_PARTY_PC -is_cloud 1"))
-        XCTAssertTrue(logs.contains("launch: DXMT_CONFIG d3d11.preferredMaxFrameRate=60 is simulated"))
+        XCTAssertTrue(logs.contains("launch: HK4E Steam path bypasses config.bat cloud flags"))
+        XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(logs.contains("launch: MTL_HUD_ENABLED=1"))
         XCTAssertTrue(logs.contains("launch: Wine Mac Driver RetinaMode=y is simulated"))
         XCTAssertTrue(logs.contains("launch: Wine Mac Driver LeftCommandIsCtrl=y is simulated"))
-        XCTAssertTrue(logs.contains("launch: HK4E HDR registry import is simulated"))
-        XCTAssertTrue(logs.contains("launch: HK4E resolution registry 2560x1440 is simulated"))
-        XCTAssertTrue(logs.contains("launch: HTTP_PROXY/HTTPS_PROXY=127.0.0.1:8080"))
+        XCTAssertTrue(logs.contains("launch: HK4E HDR registry HKEY_CURRENT_USER\\SOFTWARE\\miHoYo\\原神 WINDOWS_HDR_ON_h3132281285=dword:00000001 is simulated"))
+        XCTAssertTrue(logs.contains("launch: HK4E resolution registry HKEY_CURRENT_USER\\SOFTWARE\\miHoYo\\原神 Screenmanager Is Fullscreen mode_h3981298716=dword:00000000 Screenmanager Resolution Width_h182942802=dword:00000a00 Screenmanager Resolution Height_h2627697771=dword:000005a0 is simulated"))
+        XCTAssertTrue(logs.contains("launch: HTTP_PROXY=127.0.0.1:8080; HTTPS_PROXY=127.0.0.1:8080"))
         XCTAssertTrue(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
-        XCTAssertTrue(logs.contains("launch: steam.exe path is simulated"))
+        XCTAssertTrue(logs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 dispatchcnglobal.yuanshen.com for 10s"))
+        XCTAssertTrue(logs.contains("launch: would execute C:\\windows\\system32\\steam.exe with YuanShen.exe"))
         XCTAssertTrue(logs.contains("launch: ReShade download is disabled"))
-        XCTAssertTrue(logs.contains("launch: hosts edit is disabled on iOS"))
+        XCTAssertTrue(logs.contains("launch: HK4E HDR registry revert WINDOWS_HDR_ON_h3132281285=- is simulated"))
+        XCTAssertTrue(logs.contains("launch: HK4E resolution registry revert Screenmanager Is Fullscreen mode_h3981298716, Screenmanager Resolution Width_h182942802, Screenmanager Resolution Height_h2627697771 is simulated"))
         XCTAssertEqual(patchStates, [true, false])
     }
 
@@ -154,14 +156,101 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch: jadeite.exe wraps BH3.exe"))
         XCTAssertTrue(logs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
         XCTAssertTrue(logs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
-        XCTAssertTrue(logs.contains("launch: DXMT_CONFIG d3d11.preferredMaxFrameRate=60 is simulated"))
+        XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertFalse(logs.contains("launch: game AC patch is disabled"))
         XCTAssertFalse(logs.contains("launch: workaround3 skips tagged patch payloads"))
         XCTAssertFalse(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
-        XCTAssertFalse(logs.contains("launch: steam.exe path is simulated"))
-        XCTAssertFalse(logs.contains("launch: hosts edit is disabled on iOS"))
+        XCTAssertFalse(logs.contains { $0.contains("steam.exe") })
+        XCTAssertFalse(logs.contains { $0.contains("hosts edit disabled on iOS") })
         XCTAssertFalse(stateTexts.contains("Simulating HDR registry write"))
         XCTAssertFalse(stateTexts.contains("Applying 2560x1440"))
+    }
+
+    @MainActor
+    func testNAPResolutionTraceMatchesSteamAndBatchLaunchPaths() async throws {
+        let service = LauncherSimulationService(stepDurationMilliseconds: 0)
+        let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "nap_global" })
+        let directory = "iOS Sandbox/VirtualGameData/nap_global"
+
+        let batchCommands = try await collect(
+            service.makeProgram(
+                action: .launch,
+                client: client,
+                configuration: launchSnapshot(
+                    steamPatch: false,
+                    blockNet: true,
+                    resolutionCustom: true,
+                    resolutionWidth: 1280,
+                    resolutionHeight: 720,
+                    wineDistro: "11.0-dxmt-signed-with-patches"
+                ),
+                installDirectory: directory,
+                state: installedState(for: client, at: directory)
+            )
+        )
+        let batchLogs = batchCommands.compactMap(\.log)
+
+        XCTAssertTrue(batchLogs.contains("launch: NAP WebView cleanup HKEY_CURRENT_USER\\Software\\miHoYo\\ZenlessZoneZero removes MIHOYOSDK_WEBVIEW_RENDER_METHOD_h1573598267 and HOYO_WEBVIEW_RENDER_METHOD_ABTEST_*"))
+        XCTAssertTrue(batchLogs.contains("launch: NAP args -screen-width 1280 -screen-height 720 -screen-fullscreen 0"))
+        XCTAssertTrue(batchLogs.contains("launch: WINEMSYNC=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
+        XCTAssertTrue(batchLogs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 globaldp-prod-os01.zenlesszonezero.com for 20s"))
+        XCTAssertTrue(batchLogs.contains("launch: would execute cmd /c config.bat for ZenlessZoneZero.exe"))
+        XCTAssertTrue(batchLogs.contains("launch: NAP Screenmanager registry cleanup is simulated"))
+        XCTAssertFalse(batchLogs.contains { $0.contains("Steam path bypasses resolution args") })
+
+        let steamCommands = try await collect(
+            service.makeProgram(
+                action: .launch,
+                client: client,
+                configuration: launchSnapshot(
+                    steamPatch: true,
+                    resolutionCustom: true,
+                    resolutionWidth: 1280,
+                    resolutionHeight: 720,
+                    wineDistro: "11.0-dxmt-signed-with-patches"
+                ),
+                installDirectory: directory,
+                state: installedState(for: client, at: directory)
+            )
+        )
+        let steamLogs = steamCommands.compactMap(\.log)
+
+        XCTAssertTrue(steamLogs.contains("launch: NAP Steam path bypasses resolution args -screen-width 1280 -screen-height 720 -screen-fullscreen 0"))
+        XCTAssertTrue(steamLogs.contains("launch: would execute C:\\windows\\system32\\steam.exe with ZenlessZoneZero.exe"))
+        XCTAssertFalse(steamLogs.contains("launch: NAP args -screen-width 1280 -screen-height 720 -screen-fullscreen 0"))
+    }
+
+    @MainActor
+    func testHKRPGLaunchTraceIncludesJadeiteNVEXTAndHostsPlan() async throws {
+        let service = LauncherSimulationService(stepDurationMilliseconds: 0)
+        let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hkrpg_global" })
+        let directory = "iOS Sandbox/VirtualGameData/hkrpg_global"
+        let commands = try await collect(
+            service.makeProgram(
+                action: .launch,
+                client: client,
+                configuration: launchSnapshot(
+                    proxyEnabled: true,
+                    proxyHost: "127.0.0.1:8080",
+                    blockNet: true,
+                    wineDistro: "11.0-dxmt-signed-with-patches"
+                ),
+                installDirectory: directory,
+                state: installedState(for: client, at: directory)
+            )
+        )
+        let logs = commands.compactMap(\.log)
+
+        XCTAssertTrue(logs.contains("launch: HKRPG WebView cleanup HKEY_CURRENT_USER\\Software\\Cognosphere\\Star Rail removes MIHOYOSDK_WEBVIEW_RENDER_METHOD_h1573598267 and HOYO_WEBVIEW_RENDER_METHOD_ABTEST_*"))
+        XCTAssertTrue(logs.contains("launch: jadeite.exe wraps StarRail.exe -- -disable-gpu-skinning"))
+        XCTAssertTrue(logs.contains("launch: HKRPG NVIDIA extension registry writes are simulated"))
+        XCTAssertTrue(logs.contains("launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60;dxgi.customVendorId=10de;dxgi.customDeviceId=2684; DXMT_ENABLE_NVEXT=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
+        XCTAssertTrue(logs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 globaldp-prod-os01.starrails.com for 15s"))
+        XCTAssertTrue(logs.contains("launch: HTTP_PROXY=127.0.0.1:8080; HTTPS_PROXY=127.0.0.1:8080"))
+        XCTAssertTrue(logs.contains("launch: would execute cmd /c config.bat for StarRail.exe"))
+        XCTAssertFalse(logs.contains { $0.contains("steam.exe") })
+        XCTAssertFalse(logs.contains { $0.contains("resolution registry") })
+        XCTAssertFalse(logs.contains { $0.contains("HDR registry") })
     }
 
     private func collect(_ program: CommonUpdateProgram) async throws -> [CapturedCommand] {
@@ -178,6 +267,57 @@ final class LauncherSimulationServiceTests: XCTestCase {
             return Int.max
         }
         return index
+    }
+
+    @MainActor
+    private func installedState(for client: GameClientDescriptor, at directory: String) -> ChannelClientState {
+        ChannelClientState(
+            installState: .installed,
+            installDirectory: directory,
+            currentVersion: client.latestVersion,
+            predownloadedAll: false,
+            requiresPatchRevert: false
+        )
+    }
+
+    private func launchSnapshot(
+        metalHud: Bool = false,
+        retina: Bool = false,
+        leftCmd: Bool = false,
+        proxyEnabled: Bool = false,
+        proxyHost: String = "127.0.0.1:8080",
+        fpsUnlock: FPSUnlockOption = .disabled,
+        reshade: Bool = false,
+        patchOff: Bool = false,
+        workaround3: Bool = true,
+        steamPatch: Bool = false,
+        blockNet: Bool = false,
+        timeoutFix: Bool = false,
+        resolutionCustom: Bool = false,
+        resolutionWidth: Int = 1920,
+        resolutionHeight: Int = 1920,
+        hk4eEnableHDR: Bool = false,
+        wineDistro: String = "11.0-dxmt-signed-with-patches"
+    ) -> LauncherConfigurationSnapshot {
+        LauncherConfigurationSnapshot(
+            metalHud: metalHud,
+            retina: retina,
+            leftCmd: leftCmd,
+            proxyEnabled: proxyEnabled,
+            proxyHost: proxyHost,
+            fpsUnlock: fpsUnlock,
+            reshade: reshade,
+            patchOff: patchOff,
+            workaround3: workaround3,
+            steamPatch: steamPatch,
+            blockNet: blockNet,
+            timeoutFix: timeoutFix,
+            resolutionCustom: resolutionCustom,
+            resolutionWidth: resolutionWidth,
+            resolutionHeight: resolutionHeight,
+            hk4eEnableHDR: hk4eEnableHDR,
+            wineDistro: wineDistro
+        )
     }
 }
 

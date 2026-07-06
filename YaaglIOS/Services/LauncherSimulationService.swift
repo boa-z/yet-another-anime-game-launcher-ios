@@ -202,6 +202,8 @@ struct LauncherSimulationService: Sendable {
 
         steps.append(contentsOf: clientLaunchPlanSteps(
             client: client,
+            configuration: configuration,
+            capabilities: capabilities,
             wineDistribution: wineDistribution
         ))
 
@@ -213,16 +215,20 @@ struct LauncherSimulationService: Sendable {
             steps.append(SimulationStep("Applying Metal HUD", progress: 0.24, log: "launch: MTL_HUD_ENABLED=1"))
         }
 
-        if configuration.retina {
-            steps.append(SimulationStep("Applying Retina mode", progress: 0.25, log: "launch: Wine Mac Driver RetinaMode=y is simulated"))
-        }
+        steps.append(SimulationStep(
+            "Applying Retina mode",
+            progress: 0.25,
+            log: "launch: Wine Mac Driver RetinaMode=\(configuration.retina ? "y" : "n") is simulated"
+        ))
 
-        if configuration.leftCmd {
-            steps.append(SimulationStep("Applying left CMD mapping", progress: 0.25, log: "launch: Wine Mac Driver LeftCommandIsCtrl=y is simulated"))
-        }
+        steps.append(SimulationStep(
+            "Applying left CMD mapping",
+            progress: 0.25,
+            log: "launch: Wine Mac Driver LeftCommandIsCtrl=\(configuration.leftCmd ? "y" : "n") is simulated"
+        ))
 
         if capabilities.hdr && configuration.hk4eEnableHDR {
-            steps.append(SimulationStep("Simulating HDR registry write", progress: 0.26, log: "launch: HK4E HDR registry import is simulated"))
+            steps.append(SimulationStep("Simulating HDR registry write", progress: 0.26, log: hdrPlanLog(client: client)))
         }
 
         if capabilities.resolution && configuration.resolutionCustom {
@@ -240,7 +246,7 @@ struct LauncherSimulationService: Sendable {
         }
 
         if configuration.proxyEnabled {
-            steps.append(SimulationStep("Applying proxy \(configuration.proxyHost)", progress: 0.52, log: "launch: HTTP_PROXY/HTTPS_PROXY=\(configuration.proxyHost)"))
+            steps.append(SimulationStep("Applying proxy \(configuration.proxyHost)", progress: 0.52, log: "launch: HTTP_PROXY=\(configuration.proxyHost); HTTPS_PROXY=\(configuration.proxyHost)"))
         }
 
         if capabilities.timeoutFix && configuration.timeoutFix {
@@ -248,15 +254,18 @@ struct LauncherSimulationService: Sendable {
         }
 
         if capabilities.blockNet && configuration.blockNet {
-            steps.append(SimulationStep("Blocked hosts file modification", progress: 0.62, log: "launch: hosts edit is disabled on iOS"))
+            steps.append(SimulationStep("Blocked hosts file modification", progress: 0.62, log: hostsBlockPlanLog(for: client)))
         }
 
-        if capabilities.steamPatch && configuration.steamPatch {
-            steps.append(SimulationStep("Preparing Steam launch path", progress: 0.68, log: "launch: steam.exe path is simulated"))
-        }
+        steps.append(SimulationStep(
+            "Preparing launch command",
+            progress: 0.68,
+            log: launchExecutionPlanLog(client: client, configuration: configuration, capabilities: capabilities)
+        ))
 
+        steps.append(SimulationStep("Game is running (simulation)", progress: 0.78, log: "launch: \(client.executable) was not executed"))
+        steps.append(contentsOf: launchRevertPlanSteps(client: client, configuration: configuration, capabilities: capabilities))
         steps.append(contentsOf: [
-            SimulationStep("Game is running (simulation)", progress: 0.78, log: "launch: \(client.executable) was not executed"),
             SimulationStep("Reverting patches", progress: 0.92, virtualPatchState: false),
             SimulationStep("Launch simulation complete", progress: 1.0)
         ])
@@ -266,34 +275,51 @@ struct LauncherSimulationService: Sendable {
 
     private func clientLaunchPlanSteps(
         client: GameClientDescriptor,
+        configuration: LauncherConfigurationSnapshot,
+        capabilities: GameSettingsCapabilities,
         wineDistribution: WineDistribution?
     ) -> [SimulationStep] {
         var steps = [SimulationStep]()
 
         switch client.gameType {
         case "hk4e":
-            steps.append(SimulationStep(
-                "Preparing HK4E command line",
-                progress: 0.21,
-                log: "launch: HK4E args -platform_type CLOUD_THIRD_PARTY_PC -is_cloud 1"
-            ))
+            if capabilities.steamPatch && configuration.steamPatch {
+                steps.append(SimulationStep(
+                    "Preparing HK4E Steam launch path",
+                    progress: 0.21,
+                    log: "launch: HK4E Steam path bypasses config.bat cloud flags"
+                ))
+            } else {
+                steps.append(SimulationStep(
+                    "Preparing HK4E command line",
+                    progress: 0.21,
+                    log: "launch: HK4E config.bat args -platform_type CLOUD_THIRD_PARTY_PC -is_cloud 1"
+                ))
+            }
         case "nap":
             steps.append(SimulationStep(
                 "Simulating WebView registry cleanup",
                 progress: 0.21,
-                log: "launch: NAP WebView render registry cleanup is simulated"
+                log: webviewCleanupPlanLog(for: client)
             ))
         case "hkrpg":
             steps.append(SimulationStep(
                 "Simulating WebView registry cleanup",
                 progress: 0.21,
-                log: "launch: HKRPG WebView render registry cleanup is simulated"
+                log: webviewCleanupPlanLog(for: client)
             ))
             steps.append(SimulationStep(
                 "Preparing Jadeite launch wrapper",
                 progress: 0.22,
                 log: "launch: jadeite.exe wraps \(client.executable) -- -disable-gpu-skinning"
             ))
+            if wineDistribution?.renderBackend == "dxmt" {
+                steps.append(SimulationStep(
+                    "Simulating NVIDIA extension registry",
+                    progress: 0.22,
+                    log: "launch: HKRPG NVIDIA extension registry writes are simulated"
+                ))
+            }
         case "bh3":
             steps.append(SimulationStep(
                 "Preparing Jadeite launch wrapper",
@@ -331,23 +357,137 @@ struct LauncherSimulationService: Sendable {
     ) -> String {
         switch client.gameType {
         case "hk4e":
-            "launch: HK4E resolution registry \(configuration.resolutionWidth)x\(configuration.resolutionHeight) is simulated"
+            let key = gameRegistryKey(for: client) ?? "HK4E registry"
+            return [
+                "launch: HK4E resolution registry \(key)",
+                "Screenmanager Is Fullscreen mode_h3981298716=dword:00000000",
+                "Screenmanager Resolution Width_h182942802=dword:\(registryDword(configuration.resolutionWidth))",
+                "Screenmanager Resolution Height_h2627697771=dword:\(registryDword(configuration.resolutionHeight))",
+                "is simulated"
+            ].joined(separator: " ")
         case "nap":
-            "launch: NAP args -screen-width \(configuration.resolutionWidth) -screen-height \(configuration.resolutionHeight) -screen-fullscreen 0"
+            if configuration.steamPatch {
+                return "launch: NAP Steam path bypasses resolution args -screen-width \(configuration.resolutionWidth) -screen-height \(configuration.resolutionHeight) -screen-fullscreen 0"
+            }
+            return "launch: NAP args -screen-width \(configuration.resolutionWidth) -screen-height \(configuration.resolutionHeight) -screen-fullscreen 0"
         default:
-            "launch: custom resolution \(configuration.resolutionWidth)x\(configuration.resolutionHeight) is simulated"
+            return "launch: custom resolution \(configuration.resolutionWidth)x\(configuration.resolutionHeight) is simulated"
         }
     }
 
     private func dxmtPlanLog(for client: GameClientDescriptor) -> String {
         switch client.gameType {
         case "hkrpg":
-            "launch: DXMT_CONFIG includes NVIDIA extension flags and DXMT_ENABLE_NVEXT=1"
+            "launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60;dxgi.customVendorId=10de;dxgi.customDeviceId=2684; DXMT_ENABLE_NVEXT=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         case "nap":
-            "launch: WINEMSYNC=1 with DXMT_CONFIG_FILE is simulated"
+            "launch: WINEMSYNC=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         default:
-            "launch: DXMT_CONFIG d3d11.preferredMaxFrameRate=60 is simulated"
+            "launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         }
+    }
+
+    private func hdrPlanLog(client: GameClientDescriptor) -> String {
+        let key = gameRegistryKey(for: client) ?? "HK4E registry"
+        return "launch: HK4E HDR registry \(key) WINDOWS_HDR_ON_h3132281285=dword:00000001 is simulated"
+    }
+
+    private func webviewCleanupPlanLog(for client: GameClientDescriptor) -> String {
+        let key = gameRegistryKey(for: client) ?? "\(client.shortTitle) registry"
+        return "launch: \(client.gameType.uppercased()) WebView cleanup \(key) removes MIHOYOSDK_WEBVIEW_RENDER_METHOD_h1573598267 and HOYO_WEBVIEW_RENDER_METHOD_ABTEST_*"
+    }
+
+    private func hostsBlockPlanLog(for client: GameClientDescriptor) -> String {
+        guard let plan = hostsBlockPlan(for: client) else {
+            return "launch: hosts edit is disabled on iOS"
+        }
+        return "launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 \(plan.host) for \(plan.durationSeconds)s"
+    }
+
+    private func launchExecutionPlanLog(
+        client: GameClientDescriptor,
+        configuration: LauncherConfigurationSnapshot,
+        capabilities: GameSettingsCapabilities
+    ) -> String {
+        if capabilities.steamPatch && configuration.steamPatch {
+            return "launch: would execute C:\\windows\\system32\\steam.exe with \(client.executable)"
+        }
+        return "launch: would execute cmd /c config.bat for \(client.executable)"
+    }
+
+    private func launchRevertPlanSteps(
+        client: GameClientDescriptor,
+        configuration: LauncherConfigurationSnapshot,
+        capabilities: GameSettingsCapabilities
+    ) -> [SimulationStep] {
+        var steps = [SimulationStep]()
+
+        if capabilities.hdr && configuration.hk4eEnableHDR {
+            steps.append(SimulationStep(
+                "Reverting HK4E HDR registry",
+                progress: 0.84,
+                log: "launch: HK4E HDR registry revert WINDOWS_HDR_ON_h3132281285=- is simulated"
+            ))
+        }
+
+        if capabilities.resolution && configuration.resolutionCustom {
+            switch client.gameType {
+            case "hk4e":
+                steps.append(SimulationStep(
+                    "Reverting HK4E resolution registry",
+                    progress: 0.86,
+                    log: "launch: HK4E resolution registry revert Screenmanager Is Fullscreen mode_h3981298716, Screenmanager Resolution Width_h182942802, Screenmanager Resolution Height_h2627697771 is simulated"
+                ))
+            case "nap":
+                steps.append(SimulationStep(
+                    "Cleaning NAP Screenmanager registry",
+                    progress: 0.86,
+                    log: "launch: NAP Screenmanager registry cleanup is simulated"
+                ))
+            default:
+                break
+            }
+        }
+
+        return steps
+    }
+
+    private func gameRegistryKey(for client: GameClientDescriptor) -> String? {
+        switch client.gameType {
+        case "hk4e":
+            return client.releaseType == "cn"
+                ? "HKEY_CURRENT_USER\\SOFTWARE\\miHoYo\\原神"
+                : "HKEY_CURRENT_USER\\SOFTWARE\\miHoYo\\Genshin Impact"
+        case "nap":
+            return client.releaseType == "cn"
+                ? "HKEY_CURRENT_USER\\Software\\miHoYo\\绝区零"
+                : "HKEY_CURRENT_USER\\Software\\miHoYo\\ZenlessZoneZero"
+        case "hkrpg":
+            return client.releaseType == "cn"
+                ? "HKEY_CURRENT_USER\\Software\\miHoYo\\崩坏：星穹铁道"
+                : "HKEY_CURRENT_USER\\Software\\Cognosphere\\Star Rail"
+        default:
+            return nil
+        }
+    }
+
+    private func hostsBlockPlan(for client: GameClientDescriptor) -> (host: String, durationSeconds: Int)? {
+        switch client.gameType {
+        case "hk4e":
+            let host = client.releaseType == "cn" ? "dispatchcnglobal.yuanshen.com" : "dispatchosglobal.yuanshen.com"
+            return (host, 10)
+        case "nap":
+            let host = client.releaseType == "cn" ? "globaldp-prod-cn02.juequling.com" : "globaldp-prod-os01.zenlesszonezero.com"
+            return (host, 20)
+        case "hkrpg":
+            let host = client.releaseType == "cn" ? "globaldp-prod-cn01.bhsr.com" : "globaldp-prod-os01.starrails.com"
+            return (host, 15)
+        default:
+            return nil
+        }
+    }
+
+    private func registryDword(_ value: Int) -> String {
+        String(format: "%08x", value)
     }
 
     private func patchPlanLog(
