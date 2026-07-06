@@ -40,6 +40,10 @@ final class LauncherConfiguration {
         didSet { save(patchOff, forKey: Keys.patchOff) }
     }
 
+    var workaround3: Bool {
+        didSet { save(workaround3, forKey: Keys.workaround3) }
+    }
+
     var steamPatch: Bool {
         didSet { save(steamPatch, forKey: Keys.steamPatch) }
     }
@@ -85,6 +89,7 @@ final class LauncherConfiguration {
         uiLocale = UILocaleOption(rawValue: defaults.string(forKey: Keys.uiLocale) ?? "") ?? .simplifiedChinese
         reshade = defaults.bool(forKey: Keys.reshade)
         patchOff = defaults.bool(forKey: Keys.patchOff)
+        workaround3 = defaults.object(forKey: Keys.workaround3) as? Bool ?? true
         steamPatch = defaults.bool(forKey: Keys.steamPatch)
         blockNet = defaults.bool(forKey: Keys.blockNet)
         timeoutFix = defaults.bool(forKey: Keys.timeoutFix)
@@ -105,6 +110,7 @@ final class LauncherConfiguration {
             fpsUnlock: fpsUnlock,
             reshade: reshade,
             patchOff: patchOff,
+            workaround3: workaround3,
             steamPatch: steamPatch,
             blockNet: blockNet,
             timeoutFix: timeoutFix,
@@ -139,6 +145,7 @@ private enum Keys {
     static let uiLocale = "config_uiLocale"
     static let reshade = "config_reshade"
     static let patchOff = "config_patch_off"
+    static let workaround3 = "config_workaround3"
     static let steamPatch = "config_steam_patch"
     static let blockNet = "config_block_net"
     static let timeoutFix = "config_timeout_fix"
@@ -148,4 +155,3 @@ private enum Keys {
     static let hk4eEnableHDR = "config_hk4e_enable_hdr"
     static let wineDistro = "wine_tag"
 }
-

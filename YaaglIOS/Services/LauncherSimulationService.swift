@@ -100,7 +100,12 @@ struct LauncherSimulationService: Sendable {
         installDirectory: String
     ) -> [SimulationStep] {
         var steps = [
-            SimulationStep("Patching game files", progress: nil, virtualPatchState: true),
+            SimulationStep(
+                "Patching game files",
+                progress: nil,
+                log: patchPlanLog(configuration),
+                virtualPatchState: true
+            ),
             SimulationStep(
                 "Applying launch configuration",
                 progress: 0.16,
@@ -161,6 +166,16 @@ struct LauncherSimulationService: Sendable {
         ])
 
         return steps
+    }
+
+    private func patchPlanLog(_ configuration: LauncherConfigurationSnapshot) -> String {
+        if configuration.patchOff {
+            "launch: game AC patch is disabled"
+        } else if configuration.workaround3 {
+            "launch: workaround3 skips tagged patch payloads"
+        } else {
+            "launch: full patch payload set is simulated"
+        }
     }
 
     private func updateSteps(client: GameClientDescriptor, state: ChannelClientState) -> [SimulationStep] {

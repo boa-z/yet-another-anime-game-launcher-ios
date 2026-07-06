@@ -19,6 +19,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
                     fpsUnlock: .disabled,
                     reshade: true,
                     patchOff: false,
+                    workaround3: true,
                     steamPatch: true,
                     blockNet: true,
                     timeoutFix: true,
@@ -45,6 +46,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertLessThan(index(of: "Patching game files", in: stateTexts), index(of: "Game is running (simulation)", in: stateTexts))
         XCTAssertLessThan(index(of: "Game is running (simulation)", in: stateTexts), index(of: "Reverting patches", in: stateTexts))
         XCTAssertTrue(logs.contains("launch dir: iOS Sandbox/VirtualGameData/hk4e_cn"))
+        XCTAssertTrue(logs.contains("launch: workaround3 skips tagged patch payloads"))
         XCTAssertTrue(logs.contains("launch: Wine distro 11.0-dxmt-signed-with-patches is simulated only"))
         XCTAssertTrue(logs.contains("launch: MTL_HUD_ENABLED=1"))
         XCTAssertTrue(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
@@ -71,6 +73,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
                     fpsUnlock: .disabled,
                     reshade: false,
                     patchOff: false,
+                    workaround3: true,
                     steamPatch: false,
                     blockNet: false,
                     timeoutFix: false,

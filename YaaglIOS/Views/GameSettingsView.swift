@@ -11,6 +11,7 @@ struct GameSettingsView: View {
             LabeledContent("Executable", value: viewModel.selectedClient.executable)
 
             Toggle("Turn off the AC patch", isOn: $configuration.patchOff)
+            Toggle("Workaround #3", isOn: $configuration.workaround3)
             Toggle("Enable Steam Patch", isOn: $configuration.steamPatch)
             Toggle("Launch Fix (block hosts)", isOn: $configuration.blockNet)
             Toggle("Timeout Fix", isOn: $configuration.timeoutFix)
@@ -38,4 +39,3 @@ struct GameSettingsView: View {
             .environment(LauncherViewModel.preview)
     }
 }
-

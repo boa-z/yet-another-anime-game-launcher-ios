@@ -9,6 +9,7 @@ struct LauncherConfigurationSnapshot: Sendable {
     let fpsUnlock: FPSUnlockOption
     let reshade: Bool
     let patchOff: Bool
+    let workaround3: Bool
     let steamPatch: Bool
     let blockNet: Bool
     let timeoutFix: Bool
@@ -18,4 +19,3 @@ struct LauncherConfigurationSnapshot: Sendable {
     let hk4eEnableHDR: Bool
     let wineDistro: String
 }
-
