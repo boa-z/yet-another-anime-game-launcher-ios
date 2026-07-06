@@ -280,6 +280,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         )
     }
 
+    @MainActor
     private func launchSnapshot(
         metalHud: Bool = false,
         retina: Bool = false,

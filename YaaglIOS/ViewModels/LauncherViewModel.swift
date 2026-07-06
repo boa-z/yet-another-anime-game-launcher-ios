@@ -308,6 +308,10 @@ final class LauncherViewModel {
             apply(nextState, for: channelClient)
         }
 
+        if action == .initEnvironment {
+            configuration.completePendingWineUpdateSimulation()
+        }
+
         if isBackground {
             backgroundProgress = 1
             backgroundTaskStatus = .completed(action)

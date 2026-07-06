@@ -85,7 +85,7 @@ final class LauncherConfiguration {
     var wineDistro: String {
         didSet {
             save(wineDistro, forKey: Keys.wineDistro)
-            guard oldValue != wineDistro else {
+            guard oldValue != wineDistro, !isCompletingWineUpdateSimulation else {
                 return
             }
 
@@ -106,6 +106,7 @@ final class LauncherConfiguration {
     }
 
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private var isCompletingWineUpdateSimulation = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -155,7 +156,10 @@ final class LauncherConfiguration {
             resolutionWidth: resolutionWidth,
             resolutionHeight: resolutionHeight,
             hk4eEnableHDR: hk4eEnableHDR,
-            wineDistro: wineDistro
+            wineDistro: wineDistro,
+            wineState: wineState,
+            wineUpdateTag: wineUpdateTag,
+            wineUpdateURL: wineUpdateURL
         )
     }
 
@@ -169,6 +173,23 @@ final class LauncherConfiguration {
         }
 
         return WineDistribution.distribution(id: wineUpdateTag)
+    }
+
+    func completePendingWineUpdateSimulation() {
+        guard wineState == .update else {
+            return
+        }
+
+        let completedDistro = WineDistribution.distribution(id: wineUpdateTag)
+        if let completedDistro, wineDistro != completedDistro.id {
+            isCompletingWineUpdateSimulation = true
+            wineDistro = completedDistro.id
+            isCompletingWineUpdateSimulation = false
+        }
+
+        wineState = .ready
+        wineUpdateTag = ""
+        wineUpdateURL = ""
     }
 
     private func markWineUpdatePending(for distroID: String) {

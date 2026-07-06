@@ -108,6 +108,22 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testCompletingPendingWineUpdateSimulationMarksReadyAndClearsDesktopKeys() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        configuration.wineDistro = "11.8-dxmt-signed-experimental"
+        configuration.completePendingWineUpdateSimulation()
+
+        XCTAssertEqual(configuration.wineState, .ready)
+        XCTAssertNil(configuration.pendingWineDistribution)
+        XCTAssertEqual(defaults.string(forKey: "wine_state"), "ready")
+        XCTAssertEqual(defaults.string(forKey: "wine_tag"), "11.8-dxmt-signed-experimental")
+        XCTAssertNil(defaults.string(forKey: "wine_update_tag"))
+        XCTAssertNil(defaults.string(forKey: "wine_update_url"))
+    }
+
+    @MainActor
     func testResolutionDefaultsMatchDesktopSettings() {
         let configuration = LauncherConfiguration(defaults: makeDefaults())
 

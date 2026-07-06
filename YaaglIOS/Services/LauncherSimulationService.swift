@@ -90,7 +90,7 @@ struct LauncherSimulationService: Sendable {
                 SimulationStep("Integrity simulation complete", progress: 1.0)
             ]
         case .initEnvironment:
-            initEnvironmentSteps(requiresPatchRevert: state.requiresPatchRevert)
+            initEnvironmentSteps(requiresPatchRevert: state.requiresPatchRevert, configuration: configuration)
         case .checkLauncherUpdate:
             [
                 SimulationStep("Checking YAAGL Updates", progress: nil),
@@ -525,10 +525,40 @@ struct LauncherSimulationService: Sendable {
         ]
     }
 
-    private func initEnvironmentSteps(requiresPatchRevert: Bool) -> [SimulationStep] {
+    private func initEnvironmentSteps(
+        requiresPatchRevert: Bool,
+        configuration: LauncherConfigurationSnapshot
+    ) -> [SimulationStep] {
+        var steps = [SimulationStep("Checking pending patch state", progress: nil)]
+        let pendingWineUpdate = wineUpdatePlan(for: configuration)
+
+        if let pendingWineUpdate {
+            steps.append(contentsOf: [
+                SimulationStep(
+                    "Checking Wine distribution",
+                    progress: 0.22,
+                    log: "wine update: \(pendingWineUpdate.label) is pending installation"
+                ),
+                SimulationStep(
+                    "Blocked Wine distribution download",
+                    progress: 0.38,
+                    log: "wine update: remote archive \(pendingWineUpdate.remoteURL) was not requested"
+                ),
+                SimulationStep(
+                    "Skipping Wine install side effects",
+                    progress: 0.56,
+                    log: "wine update: extraction, wineboot, winecfg, hosts, certificates, and Media Foundation are disabled on iOS"
+                ),
+                SimulationStep(
+                    "Marking Wine environment ready",
+                    progress: 0.68,
+                    log: "wine update: wine_state will be marked ready after simulation"
+                )
+            ])
+        }
+
         if requiresPatchRevert {
-            [
-                SimulationStep("Checking pending patch state", progress: nil),
+            steps.append(contentsOf: [
                 SimulationStep(
                     "Reverting patches",
                     progress: 0.72,
@@ -536,12 +566,33 @@ struct LauncherSimulationService: Sendable {
                     virtualPatchState: false
                 ),
                 SimulationStep("Initialize simulation complete", progress: 1.0)
-            ]
+            ])
+            return steps
+        }
+
+        if pendingWineUpdate != nil {
+            steps.append(SimulationStep("Initialize simulation complete", progress: 1.0))
+            return steps
+        }
+
+        steps.append(
+            SimulationStep("No Wine prefix or patch state exists on iOS", progress: 1.0, log: "init: patch revert is a no-op")
+        )
+        return steps
+    }
+
+    private func wineUpdatePlan(for configuration: LauncherConfigurationSnapshot) -> (label: String, remoteURL: String)? {
+        guard configuration.wineState == .update else {
+            return nil
+        }
+
+        let pendingID = configuration.wineUpdateTag.isEmpty ? configuration.wineDistro : configuration.wineUpdateTag
+        if let distribution = WineDistribution.distribution(id: pendingID) {
+            let remoteURL = configuration.wineUpdateURL.isEmpty ? distribution.remoteURL : configuration.wineUpdateURL
+            return ("\(distribution.displayName) (\(distribution.id))", remoteURL)
         } else {
-            [
-                SimulationStep("Checking pending patch state", progress: nil),
-                SimulationStep("No Wine prefix or patch state exists on iOS", progress: 1.0, log: "init: patch revert is a no-op")
-            ]
+            let remoteURL = configuration.wineUpdateURL.isEmpty ? "unknown remote archive" : configuration.wineUpdateURL
+            return ("unknown Wine distribution \(pendingID)", remoteURL)
         }
     }
 }

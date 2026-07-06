@@ -266,6 +266,32 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testInitializeEnvironmentCompletesPendingWineUpdateSimulation() async {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+
+        viewModel.configuration.wineDistro = "11.8-dxmt-signed-experimental"
+
+        XCTAssertEqual(viewModel.configuration.wineState, .update)
+        XCTAssertEqual(defaults.string(forKey: "wine_state"), "update")
+
+        await viewModel.initializeEnvironment()
+
+        XCTAssertEqual(viewModel.configuration.wineState, .ready)
+        XCTAssertNil(viewModel.configuration.pendingWineDistribution)
+        XCTAssertEqual(defaults.string(forKey: "wine_state"), "ready")
+        XCTAssertNil(defaults.string(forKey: "wine_update_tag"))
+        XCTAssertNil(defaults.string(forKey: "wine_update_url"))
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "wine update: remote archive https://github.com/yaagl/anime-game-wine/releases/download/wine-11.8-signed/wine-devel-11.8-osx64-signed.tar.xz was not requested"
+        })
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "wine update: wine_state will be marked ready after simulation"
+        })
+    }
+
+    @MainActor
     func testPredownloadRunsOnBackgroundQueueWithoutBlockingPrimaryTask() async {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
