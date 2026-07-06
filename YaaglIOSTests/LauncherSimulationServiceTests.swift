@@ -66,7 +66,9 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
         XCTAssertTrue(logs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 dispatchcnglobal.yuanshen.com for 10s"))
         XCTAssertTrue(logs.contains("launch: would execute C:\\windows\\system32\\steam.exe with YuanShen.exe"))
-        XCTAssertTrue(logs.contains("launch: ReShade download is disabled"))
+        let reshadeBlockLog = "dependency: ReShade 5.8.0 metadata mirrors installed_reshade; " +
+            "ReShade_Setup_5.8.0_Addon.exe, d3dcompiler_47.dll, ReShade64.dll, ReShade.ini were not downloaded"
+        XCTAssertTrue(logs.contains(reshadeBlockLog))
         XCTAssertTrue(logs.contains("launch: HK4E HDR registry revert WINDOWS_HDR_ON_h3132281285=- is simulated"))
         XCTAssertTrue(logs.contains("launch: HK4E resolution registry revert Screenmanager Is Fullscreen mode_h3981298716, Screenmanager Resolution Width_h182942802, Screenmanager Resolution Height_h2627697771 is simulated"))
         XCTAssertEqual(patchStates, [true, false])

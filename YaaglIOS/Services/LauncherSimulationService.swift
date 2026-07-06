@@ -395,7 +395,12 @@ struct LauncherSimulationService: Sendable {
         }
 
         if configuration.reshade {
-            steps.append(SimulationStep("Blocked ReShade dependency download", progress: 0.44, log: "launch: ReShade download is disabled"))
+            let reshade = DependencyResource.resource(id: "reshade")
+            steps.append(SimulationStep(
+                "Blocked ReShade dependency download",
+                progress: 0.44,
+                log: reshade?.downloadBlockLog ?? "launch: ReShade download is disabled"
+            ))
         }
 
         if configuration.proxyEnabled {

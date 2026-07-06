@@ -25,6 +25,13 @@ struct AdvancedSettingsView: View {
                 detail: "DXMT, DXVK, ReShade, aria2, Sophon, and game patch payloads are blocked in this target."
             )
         }
+
+        Section("Dependency Metadata") {
+            ForEach(DependencyResource.catalog) { resource in
+                LabeledContent(resource.displayName, value: resource.settingsSummary)
+                LabeledContent("Desktop Path", value: resource.desktopInstallPath)
+            }
+        }
     }
 }
 
