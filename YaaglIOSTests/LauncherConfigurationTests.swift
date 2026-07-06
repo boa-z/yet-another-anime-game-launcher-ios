@@ -110,6 +110,96 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testDesktopBooleanSettingsPersistStringRawValues() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        configuration.metalHud = true
+        configuration.retina = true
+        configuration.leftCmd = true
+        configuration.proxyEnabled = true
+        configuration.reshade = true
+        configuration.patchOff = true
+        configuration.workaround3 = false
+        configuration.steamPatch = true
+        configuration.blockNet = true
+        configuration.timeoutFix = true
+        configuration.resolutionCustom = true
+        configuration.hk4eEnableHDR = true
+
+        XCTAssertEqual(defaults.string(forKey: "config_metalHud"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_retina"), "true")
+        XCTAssertEqual(defaults.string(forKey: "left_cmd"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_proxyEnabled"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_reshade"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_patch_off"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_workaround3"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_steam_patch"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_block_net"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_timeout_fix"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_resolution_custom"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_hk4e_enable_hdr"), "true")
+
+        configuration.metalHud = false
+        configuration.retina = false
+        configuration.leftCmd = false
+        configuration.proxyEnabled = false
+        configuration.reshade = false
+        configuration.patchOff = false
+        configuration.workaround3 = true
+        configuration.steamPatch = false
+        configuration.blockNet = false
+        configuration.timeoutFix = false
+        configuration.resolutionCustom = false
+        configuration.hk4eEnableHDR = false
+
+        XCTAssertEqual(defaults.string(forKey: "config_metalHud"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_retina"), "false")
+        XCTAssertEqual(defaults.string(forKey: "left_cmd"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_proxyEnabled"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_reshade"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_patch_off"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_workaround3"), "true")
+        XCTAssertEqual(defaults.string(forKey: "config_steam_patch"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_block_net"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_timeout_fix"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_resolution_custom"), "false")
+        XCTAssertEqual(defaults.string(forKey: "config_hk4e_enable_hdr"), "false")
+    }
+
+    @MainActor
+    func testDesktopBooleanSettingsLoadStringAndLegacyBoolRawValues() {
+        let defaults = makeDefaults()
+        defaults.set("true", forKey: "config_metalHud")
+        defaults.set("false", forKey: "config_retina")
+        defaults.set(true, forKey: "left_cmd")
+        defaults.set(false, forKey: "config_proxyEnabled")
+        defaults.set("true", forKey: "config_reshade")
+        defaults.set("true", forKey: "config_patch_off")
+        defaults.set("false", forKey: "config_workaround3")
+        defaults.set(true, forKey: "config_steam_patch")
+        defaults.set("true", forKey: "config_block_net")
+        defaults.set("true", forKey: "config_timeout_fix")
+        defaults.set("true", forKey: "config_resolution_custom")
+        defaults.set(true, forKey: "config_hk4e_enable_hdr")
+
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertTrue(configuration.metalHud)
+        XCTAssertFalse(configuration.retina)
+        XCTAssertTrue(configuration.leftCmd)
+        XCTAssertFalse(configuration.proxyEnabled)
+        XCTAssertTrue(configuration.reshade)
+        XCTAssertTrue(configuration.patchOff)
+        XCTAssertFalse(configuration.workaround3)
+        XCTAssertTrue(configuration.steamPatch)
+        XCTAssertTrue(configuration.blockNet)
+        XCTAssertTrue(configuration.timeoutFix)
+        XCTAssertTrue(configuration.resolutionCustom)
+        XCTAssertTrue(configuration.hk4eEnableHDR)
+    }
+
+    @MainActor
     func testWineDistributionDefaultsToDesktopDefaultTag() {
         let configuration = LauncherConfiguration(defaults: makeDefaults())
 

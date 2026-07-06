@@ -7,19 +7,19 @@ final class LauncherConfiguration {
     static let advancedSettingsUnlockEnabled = true
 
     var metalHud: Bool {
-        didSet { save(metalHud, forKey: Keys.metalHud) }
+        didSet { saveDesktopBoolString(metalHud, forKey: Keys.metalHud) }
     }
 
     var retina: Bool {
-        didSet { save(retina, forKey: Keys.retina) }
+        didSet { saveDesktopBoolString(retina, forKey: Keys.retina) }
     }
 
     var leftCmd: Bool {
-        didSet { save(leftCmd, forKey: Keys.leftCmd) }
+        didSet { saveDesktopBoolString(leftCmd, forKey: Keys.leftCmd) }
     }
 
     var proxyEnabled: Bool {
-        didSet { save(proxyEnabled, forKey: Keys.proxyEnabled) }
+        didSet { saveDesktopBoolString(proxyEnabled, forKey: Keys.proxyEnabled) }
     }
 
     var proxyHost: String {
@@ -39,31 +39,31 @@ final class LauncherConfiguration {
     }
 
     var reshade: Bool {
-        didSet { save(reshade, forKey: Keys.reshade) }
+        didSet { saveDesktopBoolString(reshade, forKey: Keys.reshade) }
     }
 
     var patchOff: Bool {
-        didSet { save(patchOff, forKey: Keys.patchOff) }
+        didSet { saveDesktopBoolString(patchOff, forKey: Keys.patchOff) }
     }
 
     var workaround3: Bool {
-        didSet { save(workaround3, forKey: Keys.workaround3) }
+        didSet { saveDesktopBoolString(workaround3, forKey: Keys.workaround3) }
     }
 
     var steamPatch: Bool {
-        didSet { save(steamPatch, forKey: Keys.steamPatch) }
+        didSet { saveDesktopBoolString(steamPatch, forKey: Keys.steamPatch) }
     }
 
     var blockNet: Bool {
-        didSet { save(blockNet, forKey: Keys.blockNet) }
+        didSet { saveDesktopBoolString(blockNet, forKey: Keys.blockNet) }
     }
 
     var timeoutFix: Bool {
-        didSet { save(timeoutFix, forKey: Keys.timeoutFix) }
+        didSet { saveDesktopBoolString(timeoutFix, forKey: Keys.timeoutFix) }
     }
 
     var resolutionCustom: Bool {
-        didSet { save(resolutionCustom, forKey: Keys.resolutionCustom) }
+        didSet { saveDesktopBoolString(resolutionCustom, forKey: Keys.resolutionCustom) }
     }
 
     var resolutionWidth: Int {
@@ -85,7 +85,7 @@ final class LauncherConfiguration {
     }
 
     var hk4eEnableHDR: Bool {
-        didSet { save(hk4eEnableHDR, forKey: Keys.hk4eEnableHDR) }
+        didSet { saveDesktopBoolString(hk4eEnableHDR, forKey: Keys.hk4eEnableHDR) }
     }
 
     private(set) var wineDistro: String {
@@ -144,24 +144,24 @@ final class LauncherConfiguration {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        metalHud = defaults.bool(forKey: Keys.metalHud)
-        retina = defaults.bool(forKey: Keys.retina)
-        leftCmd = defaults.bool(forKey: Keys.leftCmd)
-        proxyEnabled = defaults.bool(forKey: Keys.proxyEnabled)
+        metalHud = Self.loadDesktopBool(defaults, forKey: Keys.metalHud)
+        retina = Self.loadDesktopBool(defaults, forKey: Keys.retina)
+        leftCmd = Self.loadDesktopBool(defaults, forKey: Keys.leftCmd)
+        proxyEnabled = Self.loadDesktopBool(defaults, forKey: Keys.proxyEnabled)
         proxyHost = defaults.string(forKey: Keys.proxyHost) ?? "127.0.0.1:8080"
         fpsUnlock = FPSUnlockOption.option(forStoredValue: defaults.string(forKey: Keys.fpsUnlock)) ?? .disabled
         uiLocale = UILocaleOption.option(forStoredValue: defaults.string(forKey: Keys.uiLocale)) ?? .defaultOption
         advancedSettingsVisible = Self.advancedSettingsUnlockEnabled && Self.loadDesktopBool(defaults, forKey: Keys.advancedSettingsVisible)
-        reshade = defaults.bool(forKey: Keys.reshade)
-        patchOff = defaults.bool(forKey: Keys.patchOff)
-        workaround3 = defaults.object(forKey: Keys.workaround3) as? Bool ?? true
-        steamPatch = defaults.bool(forKey: Keys.steamPatch)
-        blockNet = defaults.bool(forKey: Keys.blockNet)
-        timeoutFix = defaults.bool(forKey: Keys.timeoutFix)
-        resolutionCustom = defaults.bool(forKey: Keys.resolutionCustom)
+        reshade = Self.loadDesktopBool(defaults, forKey: Keys.reshade)
+        patchOff = Self.loadDesktopBool(defaults, forKey: Keys.patchOff)
+        workaround3 = Self.loadDesktopBool(defaults, forKey: Keys.workaround3, defaultValue: true)
+        steamPatch = Self.loadDesktopBool(defaults, forKey: Keys.steamPatch)
+        blockNet = Self.loadDesktopBool(defaults, forKey: Keys.blockNet)
+        timeoutFix = Self.loadDesktopBool(defaults, forKey: Keys.timeoutFix)
+        resolutionCustom = Self.loadDesktopBool(defaults, forKey: Keys.resolutionCustom)
         resolutionWidth = max(1, defaults.integerOrDefault(forKey: Keys.resolutionWidth, defaultValue: 1920))
         resolutionHeight = max(1, defaults.integerOrDefault(forKey: Keys.resolutionHeight, defaultValue: 1920))
-        hk4eEnableHDR = defaults.bool(forKey: Keys.hk4eEnableHDR)
+        hk4eEnableHDR = Self.loadDesktopBool(defaults, forKey: Keys.hk4eEnableHDR)
         let storedWineDistro = defaults.string(forKey: Keys.wineDistro) ?? WineDistribution.defaultID
         if WineDistribution.distribution(id: storedWineDistro) != nil {
             wineDistro = storedWineDistro
@@ -330,10 +330,6 @@ final class LauncherConfiguration {
         wineUpdateURL = ""
     }
 
-    private func save(_ value: Bool, forKey key: String) {
-        defaults.set(value, forKey: key)
-    }
-
     private func save(_ value: Int, forKey key: String) {
         defaults.set(value, forKey: key)
     }
@@ -364,6 +360,18 @@ final class LauncherConfiguration {
         }
 
         return false
+    }
+
+    private static func loadDesktopBool(
+        _ defaults: UserDefaults,
+        forKey key: String,
+        defaultValue: Bool
+    ) -> Bool {
+        guard defaults.object(forKey: key) != nil else {
+            return defaultValue
+        }
+
+        return loadDesktopBool(defaults, forKey: key)
     }
 
     private static func generateWineNetbiosName() -> String {
