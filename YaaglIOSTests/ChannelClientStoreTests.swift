@@ -10,7 +10,14 @@ final class ChannelClientStoreTests: XCTestCase {
             installDirectory: "iOS Sandbox/VirtualGameData/hk4e_cn",
             currentVersion: "5.3.0",
             predownloadedAll: true,
-            requiresPatchRevert: true
+            requiresPatchRevert: true,
+            virtualInstallMetadata: VirtualInstallMetadata(
+                gameVersion: "5.3.0",
+                channelID: 1,
+                subchannelID: 1,
+                cpsReference: "CN_CPS",
+                sourceServerID: "hk4e_cn"
+            )
         )
         let secondState = ChannelClientState(
             installState: .installed,
@@ -25,6 +32,21 @@ final class ChannelClientStoreTests: XCTestCase {
 
         XCTAssertEqual(store.load(for: "hk4e_cn"), firstState)
         XCTAssertEqual(store.load(for: "hkrpg_cn"), secondState)
+    }
+
+    @MainActor
+    func testLegacyStateWithoutVirtualMetadataStillLoads() {
+        let defaults = makeDefaults()
+        defaults.set(InstallState.installed.rawValue, forKey: "client.hk4e_cn.install_state")
+        defaults.set("iOS Sandbox/VirtualGameData/hk4e_cn", forKey: "client.hk4e_cn.install_dir")
+        defaults.set("5.3.0", forKey: "client.hk4e_cn.current_version")
+
+        let state = ChannelClientStore(defaults: defaults).load(for: "hk4e_cn")
+
+        XCTAssertEqual(state.installState, .installed)
+        XCTAssertEqual(state.installDirectory, "iOS Sandbox/VirtualGameData/hk4e_cn")
+        XCTAssertEqual(state.currentVersion, "5.3.0")
+        XCTAssertNil(state.virtualInstallMetadata)
     }
 
     @MainActor

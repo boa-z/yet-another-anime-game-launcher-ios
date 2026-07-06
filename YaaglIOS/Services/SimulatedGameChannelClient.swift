@@ -65,6 +65,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
             nextState.currentVersion = descriptor.latestVersion
             nextState.predownloadedAll = false
             nextState.requiresPatchRevert = false
+            nextState.virtualInstallMetadata = VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion)
         case .importExisting:
             nextState = stateAfterImport(currentState: currentState, context: context)
         case .update:
@@ -72,6 +73,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 nextState.currentVersion = descriptor.latestVersion
                 nextState.predownloadedAll = false
                 nextState.requiresPatchRevert = false
+                nextState.virtualInstallMetadata = VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion)
             } else {
                 nextState = .empty
             }
@@ -101,7 +103,8 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 installDirectory: context.installDirectory.isEmpty ? virtualInstallDirectory() : context.installDirectory,
                 currentVersion: descriptor.latestVersion,
                 predownloadedAll: false,
-                requiresPatchRevert: false
+                requiresPatchRevert: false,
+                virtualInstallMetadata: VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion)
             )
         case .unreadable:
             return currentState
@@ -117,7 +120,8 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 installDirectory: context.installDirectory.isEmpty ? virtualInstallDirectory() : context.installDirectory,
                 currentVersion: version,
                 predownloadedAll: false,
-                requiresPatchRevert: false
+                requiresPatchRevert: false,
+                virtualInstallMetadata: VirtualInstallMetadata(client: descriptor, gameVersion: version)
             )
         }
     }

@@ -23,8 +23,26 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testPrimaryInstallPersistsVirtualDesktopConfigMetadata() async {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+
+        await viewModel.runPrimaryAction()
+
+        let savedState = ChannelClientStore(defaults: defaults).load(for: viewModel.selectedClient.id)
+
+        XCTAssertEqual(
+            savedState.virtualInstallMetadata,
+            VirtualInstallMetadata(client: viewModel.selectedClient, gameVersion: viewModel.selectedClient.latestVersion)
+        )
+    }
+
+    @MainActor
     func testOutdatedVirtualInstallUpdatesToLatestVersion() async {
-        let viewModel = makeViewModel()
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
         viewModel.installState = .installed
         viewModel.installDirectory = "iOS Sandbox/VirtualGameData/test"
         viewModel.currentVersion = "5.2.0"
@@ -36,6 +54,10 @@ final class LauncherViewModelTests: XCTestCase {
 
         XCTAssertFalse(viewModel.updateRequired)
         XCTAssertEqual(viewModel.currentVersion, viewModel.selectedClient.latestVersion)
+        XCTAssertEqual(
+            ChannelClientStore(defaults: defaults).load(for: viewModel.selectedClient.id).virtualInstallMetadata,
+            VirtualInstallMetadata(client: viewModel.selectedClient, gameVersion: viewModel.selectedClient.latestVersion)
+        )
     }
 
     @MainActor
@@ -150,13 +172,18 @@ final class LauncherViewModelTests: XCTestCase {
         )
         store.save(retainedState, for: "hk4e_cn")
         let viewModel = makeViewModel(defaults: defaults)
+        var refreshedRetainedState = retainedState
+        refreshedRetainedState.virtualInstallMetadata = VirtualInstallMetadata(
+            client: viewModel.selectedClient,
+            gameVersion: retainedState.currentVersion
+        )
 
         await viewModel.importExistingVirtualInstall(
             path: "Imported/TooOld",
             probeResult: .existing(version: "4.9.0")
         )
 
-        XCTAssertEqual(store.load(for: viewModel.selectedClient.id), retainedState)
+        XCTAssertEqual(store.load(for: viewModel.selectedClient.id), refreshedRetainedState)
         XCTAssertEqual(viewModel.installDirectory, retainedState.installDirectory)
         XCTAssertEqual(viewModel.currentVersion, retainedState.currentVersion)
         XCTAssertEqual(viewModel.primaryAction, .launch)
@@ -234,6 +261,10 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.currentVersion, "5.2.0")
         XCTAssertEqual(viewModel.primaryAction, .update)
         XCTAssertEqual(store.load(for: viewModel.selectedClient.id).currentVersion, "5.2.0")
+        XCTAssertEqual(
+            store.load(for: viewModel.selectedClient.id).virtualInstallMetadata,
+            VirtualInstallMetadata(client: viewModel.selectedClient, gameVersion: "5.2.0")
+        )
     }
 
     @MainActor

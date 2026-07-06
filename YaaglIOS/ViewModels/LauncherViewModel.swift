@@ -344,7 +344,8 @@ final class LauncherViewModel {
             installDirectory: installDirectory,
             currentVersion: currentVersion,
             predownloadedAll: persistedState.predownloadedAll,
-            requiresPatchRevert: persistedState.requiresPatchRevert
+            requiresPatchRevert: persistedState.requiresPatchRevert,
+            virtualInstallMetadata: persistedState.virtualInstallMetadata
         )
     }
 
@@ -372,6 +373,10 @@ final class LauncherViewModel {
         case .existing(let version):
             var refreshedState = storedState
             refreshedState.currentVersion = version
+            refreshedState.virtualInstallMetadata = VirtualInstallMetadata(
+                client: channelClient.descriptor,
+                gameVersion: version
+            )
             return refreshedState
         case .newTarget, .unreadable:
             return .empty
