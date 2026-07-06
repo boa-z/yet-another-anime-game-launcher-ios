@@ -108,7 +108,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
             )
         case .unreadable:
             return currentState
-        case .existing(let version):
+        case .existing(let version, let metadata):
             let detectedVersion = SemanticVersion(version)
             let latestVersion = SemanticVersion(descriptor.latestVersion)
             guard detectedVersion >= latestVersion || descriptor.updatableVersions.contains(version) else {
@@ -121,7 +121,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 currentVersion: version,
                 predownloadedAll: false,
                 requiresPatchRevert: false,
-                virtualInstallMetadata: VirtualInstallMetadata(client: descriptor, gameVersion: version)
+                virtualInstallMetadata: metadata ?? VirtualInstallMetadata(client: descriptor, gameVersion: version)
             )
         }
     }

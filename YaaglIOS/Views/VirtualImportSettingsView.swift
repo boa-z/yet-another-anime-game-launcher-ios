@@ -4,12 +4,29 @@ struct VirtualImportSettingsView: View {
     @Environment(LauncherViewModel.self) private var viewModel
     @State private var importPath = ""
     @State private var detectedVersion = ""
+    @State private var probeSnippet = ""
+    @State private var probeStatus = ""
+    @State private var detectedMetadata: VirtualInstallMetadata?
 
     var body: some View {
         Section("Virtual Import") {
             TextField("Install Directory", text: $importPath)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+
+            TextField("Version Probe Snippet", text: $probeSnippet, axis: .vertical)
+                .lineLimit(4...8)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            Button("Parse Snippet", systemImage: "doc.text.magnifyingglass", action: parseProbeSnippet)
+                .disabled(!canParseSnippet)
+
+            if !probeStatus.isEmpty {
+                Text(probeStatus)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
             TextField("Detected Version", text: $detectedVersion)
                 .textInputAutocapitalization(.never)
@@ -37,16 +54,49 @@ struct VirtualImportSettingsView: View {
             && !viewModel.isBusy
     }
 
+    private var canParseSnippet: Bool {
+        !probeSnippet.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !viewModel.isBusy
+    }
+
+    private var metadataForImport: VirtualInstallMetadata? {
+        let version = detectedVersion.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard detectedMetadata?.gameVersion == version else {
+            return nil
+        }
+        return detectedMetadata
+    }
+
     private func fillDefaults() {
         importPath = "iOS Sandbox/Imported/\(viewModel.selectedClient.id)"
         detectedVersion = viewModel.selectedClient.latestVersion
+        probeSnippet = ""
+        probeStatus = ""
+        detectedMetadata = nil
+    }
+
+    private func parseProbeSnippet() {
+        let parsedSnippet = VirtualInstallSnippetParser().parse(
+            probeSnippet,
+            for: viewModel.selectedClient
+        )
+        probeStatus = parsedSnippet.message
+
+        if case .existing(let version, let metadata) = parsedSnippet.probeResult {
+            detectedVersion = version
+            detectedMetadata = metadata
+        } else {
+            detectedMetadata = nil
+        }
     }
 
     private func importExisting() {
+        let version = detectedVersion.trimmingCharacters(in: .whitespacesAndNewlines)
+        let metadata = metadataForImport
         Task {
             await viewModel.importExistingVirtualInstall(
                 path: importPath,
-                probeResult: .existing(version: detectedVersion)
+                probeResult: .existing(version: version, metadata: metadata)
             )
         }
     }

@@ -174,6 +174,33 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testImportExistingPersistsParsedVirtualMetadata() async {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let metadata = VirtualInstallMetadata(
+            gameVersion: "5.2.0",
+            channelID: 9,
+            subchannelID: 8,
+            cpsReference: "PASTED_CPS",
+            sourceServerID: viewModel.selectedClient.serverID
+        )
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/ParsedGI",
+            probeResult: .existing(version: "5.2.0", metadata: metadata)
+        )
+
+        XCTAssertEqual(
+            ChannelClientStore(defaults: defaults).load(for: viewModel.selectedClient.id).virtualInstallMetadata,
+            metadata
+        )
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "import: pasted metadata game_version=5.2.0 channel=9 sub_channel=8 cps=<PASTED_CPS> is represented without reading game files"
+        })
+    }
+
+    @MainActor
     func testImportExistingUnsupportedVersionKeepsStoredInstallUnchanged() async {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
@@ -221,6 +248,33 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.primaryAction, .launch)
         XCTAssertEqual(viewModel.statusText, "Import simulation complete")
         XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "integrity: local files were not read or repaired" })
+    }
+
+    @MainActor
+    func testImportExistingPersistsParsedDesktopMetadata() async {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let metadata = VirtualInstallMetadata(
+            gameVersion: viewModel.selectedClient.latestVersion,
+            channelID: 9,
+            subchannelID: 2,
+            cpsReference: "CUSTOM_CPS",
+            sourceServerID: viewModel.selectedClient.serverID
+        )
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/Metadata",
+            probeResult: .existing(version: viewModel.selectedClient.latestVersion, metadata: metadata)
+        )
+
+        XCTAssertEqual(
+            ChannelClientStore(defaults: defaults).load(for: viewModel.selectedClient.id).virtualInstallMetadata,
+            metadata
+        )
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "import: pasted metadata game_version=5.3.0 channel=9 sub_channel=2 cps=<CUSTOM_CPS> is represented without reading game files"
+        })
     }
 
     @MainActor

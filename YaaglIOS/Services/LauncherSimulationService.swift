@@ -229,7 +229,7 @@ struct LauncherSimulationService: Sendable {
                     log: "import: existing directory probe failed; virtual install record is unchanged"
                 )
             ]
-        case .existing(let version):
+        case .existing(let version, let metadata):
             let detectedVersion = SemanticVersion(version)
             let latestVersion = SemanticVersion(client.latestVersion)
             if detectedVersion < latestVersion && !client.updatableVersions.contains(version) {
@@ -243,19 +243,31 @@ struct LauncherSimulationService: Sendable {
                 ]
             }
 
+            let metadataStep = metadata.map {
+                SimulationStep(
+                    "Representing imported desktop metadata",
+                    progress: 0.9,
+                    log: importedMetadataLog($0)
+                )
+            }
+
             if detectedVersion < latestVersion {
-                return [
+                var steps = [
                     SimulationStep("Reading existing game version", progress: nil),
                     SimulationStep(
                         "Importing updatable version \(version)",
                         progress: 0.72,
                         log: "import: existing package at \(installDirectory) requires update"
-                    ),
-                    SimulationStep("Import simulation complete", progress: 1.0)
+                    )
                 ]
+                if let metadataStep {
+                    steps.append(metadataStep)
+                }
+                steps.append(SimulationStep("Import simulation complete", progress: 1.0))
+                return steps
             }
 
-            return [
+            var steps = [
                 SimulationStep("Reading existing game version", progress: nil),
                 SimulationStep("Checking game file integrity. Completed files 0/6", progress: 0.18),
                 SimulationStep("Checking game file integrity. Completed files 2/6", progress: 0.38),
@@ -264,10 +276,19 @@ struct LauncherSimulationService: Sendable {
                     "Blocked file repair download",
                     progress: 0.84,
                     log: "integrity: local files were not read or repaired"
-                ),
-                SimulationStep("Import simulation complete", progress: 1.0)
+                )
             ]
+            if let metadataStep {
+                steps.append(metadataStep)
+            }
+            steps.append(SimulationStep("Import simulation complete", progress: 1.0))
+            return steps
         }
+    }
+
+    private func importedMetadataLog(_ metadata: VirtualInstallMetadata) -> String {
+        let cpsDisplayValue = metadata.cpsReference.isEmpty ? "" : "<\(metadata.cpsReference)>"
+        return "import: pasted metadata game_version=\(metadata.gameVersion) channel=\(metadata.channelID) sub_channel=\(metadata.subchannelID) cps=\(cpsDisplayValue) is represented without reading game files"
     }
 
     private func launchSteps(

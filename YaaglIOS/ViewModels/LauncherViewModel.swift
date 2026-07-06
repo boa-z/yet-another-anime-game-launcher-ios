@@ -402,10 +402,10 @@ final class LauncherViewModel {
             client: channelClient.descriptor,
             persistedState: storedState
         ) {
-        case .existing(let version):
+        case .existing(let version, let metadata):
             var refreshedState = storedState
             refreshedState.currentVersion = version
-            refreshedState.virtualInstallMetadata = VirtualInstallMetadata(
+            refreshedState.virtualInstallMetadata = metadata ?? VirtualInstallMetadata(
                 client: channelClient.descriptor,
                 gameVersion: version
             )
