@@ -12,6 +12,8 @@ struct GeneralSettingsView: View {
             Toggle("Map left CMD to CTRL", isOn: $configuration.leftCmd)
         }
 
+        VirtualImportSettingsView()
+
         Section("Proxy") {
             Toggle("Enable HTTP Proxy", isOn: $configuration.proxyEnabled)
             TextField("HTTP Proxy Host", text: $configuration.proxyHost)
@@ -45,4 +47,3 @@ struct GeneralSettingsView: View {
             .environment(LauncherViewModel.preview)
     }
 }
-
