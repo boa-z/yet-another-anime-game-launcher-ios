@@ -12,14 +12,16 @@ struct LauncherSimulationService: Sendable {
         client: GameClientDescriptor,
         configuration: LauncherConfigurationSnapshot,
         installDirectory: String,
-        state: ChannelClientState
+        state: ChannelClientState,
+        importProbeResult: VirtualInstallProbeResult? = nil
     ) -> CommonUpdateProgram {
         let steps = steps(
             for: action,
             client: client,
             configuration: configuration,
             installDirectory: installDirectory,
-            state: state
+            state: state,
+            importProbeResult: importProbeResult
         )
 
         return CommonUpdateProgram { continuation in
@@ -49,7 +51,8 @@ struct LauncherSimulationService: Sendable {
         client: GameClientDescriptor,
         configuration: LauncherConfigurationSnapshot,
         installDirectory: String,
-        state: ChannelClientState
+        state: ChannelClientState,
+        importProbeResult: VirtualInstallProbeResult?
     ) -> [SimulationStep] {
         switch action {
         case .install:
@@ -60,6 +63,8 @@ struct LauncherSimulationService: Sendable {
                 SimulationStep("Saving current version \(client.latestVersion)", progress: 0.86),
                 SimulationStep("Install simulation complete", progress: 1.0)
             ]
+        case .importExisting:
+            importExistingSteps(client: client, installDirectory: installDirectory, probeResult: importProbeResult)
         case .update:
             updateSteps(client: client, state: state)
         case .launch:
@@ -90,6 +95,80 @@ struct LauncherSimulationService: Sendable {
             [
                 SimulationStep("Checking YAAGL Updates", progress: nil),
                 SimulationStep("Launcher update simulation complete", progress: 1.0, log: "launcher update: network update check is currently local-only")
+            ]
+        }
+    }
+
+    private func importExistingSteps(
+        client: GameClientDescriptor,
+        installDirectory: String,
+        probeResult: VirtualInstallProbeResult?
+    ) -> [SimulationStep] {
+        guard let probeResult else {
+            return [
+                SimulationStep("Reading existing game version", progress: nil),
+                SimulationStep(
+                    "Could not read game version",
+                    progress: 1.0,
+                    log: "import: no simulated package version was provided"
+                )
+            ]
+        }
+
+        switch probeResult {
+        case .newTarget:
+            return [
+                SimulationStep("Preparing new install target", progress: nil),
+                SimulationStep("Blocked game resource download for \(client.shortTitle)", progress: 0.35, log: "install: real Sophon download is disabled on iOS"),
+                SimulationStep("Creating virtual installation record", progress: 0.78),
+                SimulationStep("Install simulation complete", progress: 1.0)
+            ]
+        case .unreadable:
+            return [
+                SimulationStep("Reading existing game version", progress: nil),
+                SimulationStep(
+                    "Could not read game version",
+                    progress: 1.0,
+                    log: "import: existing directory probe failed; virtual install record is unchanged"
+                )
+            ]
+        case .existing(let version):
+            let detectedVersion = SemanticVersion(version)
+            let latestVersion = SemanticVersion(client.latestVersion)
+            if detectedVersion < latestVersion && !client.updatableVersions.contains(version) {
+                return [
+                    SimulationStep("Reading existing game version", progress: nil),
+                    SimulationStep(
+                        "Unsupported game version \(version)",
+                        progress: 1.0,
+                        log: "import: \(version) is not in updatable versions; virtual install record is unchanged"
+                    )
+                ]
+            }
+
+            if detectedVersion < latestVersion {
+                return [
+                    SimulationStep("Reading existing game version", progress: nil),
+                    SimulationStep(
+                        "Importing updatable version \(version)",
+                        progress: 0.72,
+                        log: "import: existing package at \(installDirectory) requires update"
+                    ),
+                    SimulationStep("Import simulation complete", progress: 1.0)
+                ]
+            }
+
+            return [
+                SimulationStep("Reading existing game version", progress: nil),
+                SimulationStep("Checking game file integrity. Completed files 0/6", progress: 0.18),
+                SimulationStep("Checking game file integrity. Completed files 2/6", progress: 0.38),
+                SimulationStep("Checking game file integrity. Completed files 4/6", progress: 0.62),
+                SimulationStep(
+                    "Blocked file repair download",
+                    progress: 0.84,
+                    log: "integrity: local files were not read or repaired"
+                ),
+                SimulationStep("Import simulation complete", progress: 1.0)
             ]
         }
     }

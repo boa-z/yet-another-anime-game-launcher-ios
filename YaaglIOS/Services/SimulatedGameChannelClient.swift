@@ -46,7 +46,8 @@ struct SimulatedGameChannelClient: GameChannelClient {
             client: descriptor,
             configuration: context.configuration,
             installDirectory: context.installDirectory,
-            state: context.state
+            state: context.state,
+            importProbeResult: context.importProbeResult
         )
     }
 
@@ -64,6 +65,8 @@ struct SimulatedGameChannelClient: GameChannelClient {
             nextState.currentVersion = descriptor.latestVersion
             nextState.predownloadedAll = false
             nextState.requiresPatchRevert = false
+        case .importExisting:
+            nextState = stateAfterImport(currentState: currentState, context: context)
         case .update:
             if descriptor.updatableVersions.contains(currentState.currentVersion) {
                 nextState.currentVersion = descriptor.latestVersion
@@ -81,5 +84,41 @@ struct SimulatedGameChannelClient: GameChannelClient {
         }
 
         return nextState
+    }
+
+    private func stateAfterImport(
+        currentState: ChannelClientState,
+        context: GameChannelClientContext
+    ) -> ChannelClientState {
+        guard let importProbeResult = context.importProbeResult else {
+            return currentState
+        }
+
+        switch importProbeResult {
+        case .newTarget:
+            return ChannelClientState(
+                installState: .installed,
+                installDirectory: context.installDirectory.isEmpty ? virtualInstallDirectory() : context.installDirectory,
+                currentVersion: descriptor.latestVersion,
+                predownloadedAll: false,
+                requiresPatchRevert: false
+            )
+        case .unreadable:
+            return currentState
+        case .existing(let version):
+            let detectedVersion = SemanticVersion(version)
+            let latestVersion = SemanticVersion(descriptor.latestVersion)
+            guard detectedVersion >= latestVersion || descriptor.updatableVersions.contains(version) else {
+                return currentState
+            }
+
+            return ChannelClientState(
+                installState: .installed,
+                installDirectory: context.installDirectory.isEmpty ? virtualInstallDirectory() : context.installDirectory,
+                currentVersion: version,
+                predownloadedAll: false,
+                requiresPatchRevert: false
+            )
+        }
     }
 }

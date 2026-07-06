@@ -105,6 +105,138 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testNewTargetSelectionRunsFreshVirtualInstallAtSelectedPath() async {
+        let viewModel = makeViewModel()
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/NewTarget",
+            probeResult: .newTarget
+        )
+
+        XCTAssertEqual(viewModel.installState, .installed)
+        XCTAssertEqual(viewModel.installDirectory, "Imported/NewTarget")
+        XCTAssertEqual(viewModel.currentVersion, viewModel.selectedClient.latestVersion)
+        XCTAssertEqual(viewModel.primaryAction, .launch)
+    }
+
+    @MainActor
+    func testImportExistingUpdatableVersionBecomesUpdateAction() async {
+        let viewModel = makeViewModel()
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/GI",
+            probeResult: .existing(version: "5.2.0")
+        )
+
+        XCTAssertEqual(viewModel.installState, .installed)
+        XCTAssertEqual(viewModel.installDirectory, "Imported/GI")
+        XCTAssertEqual(viewModel.currentVersion, "5.2.0")
+        XCTAssertEqual(viewModel.primaryAction, .update)
+        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "import: existing package at Imported/GI requires update" })
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message.contains("Blocked game resource download") })
+    }
+
+    @MainActor
+    func testImportExistingUnsupportedVersionKeepsStoredInstallUnchanged() async {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let store = ChannelClientStore(defaults: defaults)
+        let retainedState = ChannelClientState(
+            installState: .installed,
+            installDirectory: "Imported/Retained",
+            currentVersion: "5.3.0",
+            predownloadedAll: false,
+            requiresPatchRevert: false
+        )
+        store.save(retainedState, for: "hk4e_cn")
+        let viewModel = makeViewModel(defaults: defaults)
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/TooOld",
+            probeResult: .existing(version: "4.9.0")
+        )
+
+        XCTAssertEqual(store.load(for: viewModel.selectedClient.id), retainedState)
+        XCTAssertEqual(viewModel.installDirectory, retainedState.installDirectory)
+        XCTAssertEqual(viewModel.currentVersion, retainedState.currentVersion)
+        XCTAssertEqual(viewModel.primaryAction, .launch)
+        XCTAssertEqual(viewModel.statusText, "Unsupported game version 4.9.0")
+        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Import skipped: existing virtual install record unchanged" })
+    }
+
+    @MainActor
+    func testImportExistingLatestVersionRunsIntegritySimulationThenLaunches() async {
+        let viewModel = makeViewModel()
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/Latest",
+            probeResult: .existing(version: viewModel.selectedClient.latestVersion)
+        )
+
+        XCTAssertEqual(viewModel.installState, .installed)
+        XCTAssertEqual(viewModel.installDirectory, "Imported/Latest")
+        XCTAssertEqual(viewModel.currentVersion, viewModel.selectedClient.latestVersion)
+        XCTAssertEqual(viewModel.primaryAction, .launch)
+        XCTAssertEqual(viewModel.statusText, "Import simulation complete")
+        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "integrity: local files were not read or repaired" })
+    }
+
+    @MainActor
+    func testStoredVirtualInstallProbeFailureResetsState() {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "Imported/Missing",
+                currentVersion: "5.3.0",
+                predownloadedAll: true,
+                requiresPatchRevert: true
+            ),
+            for: "hk4e_cn"
+        )
+
+        let viewModel = makeViewModel(
+            defaults: defaults,
+            installProbe: VirtualInstallProbe { _, _, _ in .unreadable }
+        )
+
+        XCTAssertEqual(viewModel.installState, .notInstalled)
+        XCTAssertEqual(viewModel.installDirectory, "")
+        XCTAssertEqual(viewModel.currentVersion, "0.0.0")
+        XCTAssertEqual(store.load(for: viewModel.selectedClient.id), .empty)
+    }
+
+    @MainActor
+    func testStoredVirtualInstallProbeRefreshesVersion() {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "Imported/Refresh",
+                currentVersion: "5.1.0",
+                predownloadedAll: false,
+                requiresPatchRevert: false
+            ),
+            for: "hk4e_cn"
+        )
+
+        let viewModel = makeViewModel(
+            defaults: defaults,
+            installProbe: VirtualInstallProbe { _, _, _ in .existing(version: "5.2.0") }
+        )
+
+        XCTAssertEqual(viewModel.installState, .installed)
+        XCTAssertEqual(viewModel.installDirectory, "Imported/Refresh")
+        XCTAssertEqual(viewModel.currentVersion, "5.2.0")
+        XCTAssertEqual(viewModel.primaryAction, .update)
+        XCTAssertEqual(store.load(for: viewModel.selectedClient.id).currentVersion, "5.2.0")
+    }
+
+    @MainActor
     func testInitializeEnvironmentClearsVirtualPatchMarkerOnce() async {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
@@ -172,12 +304,14 @@ final class LauncherViewModelTests: XCTestCase {
     @MainActor
     private func makeViewModel(
         defaults: UserDefaults? = nil,
-        stepDurationMilliseconds: Int = 0
+        stepDurationMilliseconds: Int = 0,
+        installProbe: VirtualInstallProbe = .trustingPersistedRecord
     ) -> LauncherViewModel {
         let defaults = defaults ?? makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
         return LauncherViewModel(
             defaults: defaults,
-            channelClients: GameChannelClientFactory.makeTestingClients(stepDurationMilliseconds: stepDurationMilliseconds)
+            channelClients: GameChannelClientFactory.makeTestingClients(stepDurationMilliseconds: stepDurationMilliseconds),
+            installProbe: installProbe
         )
     }
 

@@ -33,12 +33,14 @@ final class LauncherViewModel {
     @ObservationIgnored private let backgroundTaskQueue: LauncherTaskQueue
     @ObservationIgnored private let channelClients: [String: any GameChannelClient]
     @ObservationIgnored private let defaultChannelClient: any GameChannelClient
+    @ObservationIgnored private let installProbe: VirtualInstallProbe
     @ObservationIgnored private var dismissedPredownloadPromptClientIDs = Set<String>()
     @ObservationIgnored private var didInitializeEnvironment = false
 
     init(
         defaults: UserDefaults = .standard,
-        channelClients: [any GameChannelClient] = GameChannelClientFactory.makeDefaultClients()
+        channelClients: [any GameChannelClient] = GameChannelClientFactory.makeDefaultClients(),
+        installProbe: VirtualInstallProbe = .trustingPersistedRecord
     ) {
         let resolvedClients = channelClients.isEmpty ? GameChannelClientFactory.makeDefaultClients() : channelClients
         guard let defaultChannelClient = resolvedClients.first else {
@@ -48,6 +50,7 @@ final class LauncherViewModel {
         self.defaults = defaults
         self.channelClients = Dictionary(uniqueKeysWithValues: resolvedClients.map { ($0.descriptor.id, $0) })
         self.defaultChannelClient = defaultChannelClient
+        self.installProbe = installProbe
         clients = resolvedClients.map(\.descriptor)
         configuration = LauncherConfiguration(defaults: defaults)
         store = ChannelClientStore(defaults: defaults)
@@ -120,6 +123,29 @@ final class LauncherViewModel {
         await run(.checkLauncherUpdate)
     }
 
+    func importExistingVirtualInstall(
+        path: String,
+        probeResult: VirtualInstallProbeResult
+    ) async {
+        let installDirectory = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !installDirectory.isEmpty else {
+            alertMessage = "Import path is empty"
+            appendHistory(.importExisting, "Import skipped: empty virtual install path")
+            return
+        }
+
+        switch probeResult {
+        case .newTarget:
+            await run(.install, installDirectoryOverride: installDirectory)
+        case .existing, .unreadable:
+            await run(
+                .importExisting,
+                installDirectoryOverride: installDirectory,
+                importProbeResult: probeResult
+            )
+        }
+    }
+
     func initializeEnvironment() async {
         guard !didInitializeEnvironment else {
             return
@@ -140,15 +166,22 @@ final class LauncherViewModel {
         appendHistory(.initEnvironment, "Virtual install record cleared")
     }
 
-    private func run(_ action: LauncherAction) async {
+    private func run(
+        _ action: LauncherAction,
+        installDirectoryOverride: String? = nil,
+        importProbeResult: VirtualInstallProbeResult? = nil
+    ) async {
         let channelClient = selectedChannelClient
         let stateBeforeRun = currentState
+        let installDirectory = installDirectoryOverride
+            ?? (stateBeforeRun.installDirectory.isEmpty
+                ? channelClient.virtualInstallDirectory()
+                : stateBeforeRun.installDirectory)
         let context = GameChannelClientContext(
             configuration: configuration.snapshot,
-            installDirectory: stateBeforeRun.installDirectory.isEmpty
-                ? channelClient.virtualInstallDirectory()
-                : stateBeforeRun.installDirectory,
-            state: stateBeforeRun
+            installDirectory: installDirectory,
+            state: stateBeforeRun,
+            importProbeResult: importProbeResult
         )
 
         let result = await taskQueue.run(
@@ -286,7 +319,13 @@ final class LauncherViewModel {
     }
 
     private func restoreClientState() {
-        apply(store.load(for: selectedClient.id), for: selectedChannelClient)
+        let storedState = store.load(for: selectedClient.id)
+        let restoredState = probedState(from: storedState, for: selectedChannelClient)
+        if restoredState != storedState {
+            store.save(restoredState, for: selectedClient.id)
+        }
+
+        apply(restoredState, for: selectedChannelClient)
         statusText = "Ready"
         progress = nil
         taskStatus = .idle
@@ -311,6 +350,28 @@ final class LauncherViewModel {
         currentVersion = state.currentVersion
         showPredownloadPrompt = !dismissedPredownloadPromptClientIDs.contains(channelClient.descriptor.id)
             && channelClient.showPredownloadPrompt(in: state)
+    }
+
+    private func probedState(
+        from storedState: ChannelClientState,
+        for channelClient: any GameChannelClient
+    ) -> ChannelClientState {
+        guard storedState.installState == .installed, !storedState.installDirectory.isEmpty else {
+            return storedState
+        }
+
+        switch installProbe.result(
+            for: storedState.installDirectory,
+            client: channelClient.descriptor,
+            persistedState: storedState
+        ) {
+        case .existing(let version):
+            var refreshedState = storedState
+            refreshedState.currentVersion = version
+            return refreshedState
+        case .newTarget, .unreadable:
+            return .empty
+        }
     }
 
     private var persistedState: ChannelClientState {
@@ -362,6 +423,13 @@ final class LauncherViewModel {
            before.installState == .installed,
            after.installState == .notInstalled {
             "Update skipped: unsupported version; virtual install record reset"
+        } else if action == .importExisting,
+                  before == after,
+                  after.installState == .notInstalled {
+            "Import skipped: existing install could not be used"
+        } else if action == .importExisting,
+                  before == after {
+            "Import skipped: existing virtual install record unchanged"
         } else {
             "\(action.title) completed"
         }

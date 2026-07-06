@@ -2,6 +2,7 @@ import Foundation
 
 enum LauncherAction: String, Identifiable, Sendable {
     case install
+    case importExisting
     case update
     case launch
     case predownload
@@ -15,6 +16,8 @@ enum LauncherAction: String, Identifiable, Sendable {
         switch self {
         case .install:
             "Install Game"
+        case .importExisting:
+            "Import Existing Game"
         case .update:
             "Update Game"
         case .launch:
@@ -34,6 +37,8 @@ enum LauncherAction: String, Identifiable, Sendable {
         switch self {
         case .install:
             "square.and.arrow.down"
+        case .importExisting:
+            "folder.badge.gearshape"
         case .update:
             "arrow.triangle.2.circlepath"
         case .launch:
@@ -49,4 +54,3 @@ enum LauncherAction: String, Identifiable, Sendable {
         }
     }
 }
-
