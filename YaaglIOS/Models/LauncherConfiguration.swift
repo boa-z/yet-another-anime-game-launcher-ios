@@ -49,7 +49,14 @@ final class LauncherConfiguration {
     }
 
     var workaround3: Bool {
-        didSet { saveDesktopBoolString(workaround3, forKey: Keys.workaround3) }
+        didSet {
+            guard !isApplyingUnstoredWorkaround3Default else {
+                return
+            }
+
+            hasStoredWorkaround3 = true
+            saveDesktopBoolString(workaround3, forKey: Keys.workaround3)
+        }
     }
 
     var steamPatch: Bool {
@@ -144,16 +151,20 @@ final class LauncherConfiguration {
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var hasStoredWineDistro: Bool
+    @ObservationIgnored private var hasStoredWorkaround3: Bool
+    @ObservationIgnored private var isApplyingUnstoredWorkaround3Default = false
 
     init(
         defaults: UserDefaults = .standard,
         defaultWineDistro: String = WineDistribution.defaultID,
+        defaultWorkaround3: Bool = true,
         advancedSettingsUnlockEnabled: Bool = LauncherConfiguration.defaultAdvancedSettingsUnlockEnabled
     ) {
         self.defaults = defaults
         self.advancedSettingsUnlockEnabled = advancedSettingsUnlockEnabled
         let storedWineDistro = defaults.string(forKey: Keys.wineDistro)
         hasStoredWineDistro = storedWineDistro?.isEmpty == false
+        hasStoredWorkaround3 = defaults.object(forKey: Keys.workaround3) != nil
         metalHud = Self.loadDesktopBool(defaults, forKey: Keys.metalHud)
         retina = Self.loadDesktopBool(defaults, forKey: Keys.retina)
         leftCmd = Self.loadDesktopBool(defaults, forKey: Keys.leftCmd)
@@ -166,7 +177,7 @@ final class LauncherConfiguration {
         advancedSettingsVisible = advancedSettingsUnlockEnabled && Self.loadDesktopBool(defaults, forKey: Keys.advancedSettingsVisible)
         reshade = Self.loadDesktopBool(defaults, forKey: Keys.reshade)
         patchOff = Self.loadDesktopBool(defaults, forKey: Keys.patchOff)
-        workaround3 = Self.loadDesktopBool(defaults, forKey: Keys.workaround3, defaultValue: true)
+        workaround3 = Self.loadDesktopBool(defaults, forKey: Keys.workaround3, defaultValue: defaultWorkaround3)
         steamPatch = Self.loadDesktopBool(defaults, forKey: Keys.steamPatch)
         blockNet = Self.loadDesktopBool(defaults, forKey: Keys.blockNet)
         timeoutFix = Self.loadDesktopBool(defaults, forKey: Keys.timeoutFix)
@@ -306,6 +317,18 @@ final class LauncherConfiguration {
         }
 
         wineDistro = Self.nonEmptyWineDistro(distroID)
+    }
+
+    func useDefaultWorkaround3(_ enabled: Bool) {
+        guard !hasStoredWorkaround3 else {
+            return
+        }
+
+        isApplyingUnstoredWorkaround3Default = true
+        defer {
+            isApplyingUnstoredWorkaround3Default = false
+        }
+        workaround3 = enabled
     }
 
     func completePendingWineUpdateSimulation() {

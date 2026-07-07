@@ -27,6 +27,7 @@ final class LauncherViewModel {
 
             defaults.set(selectedClientID, forKey: Keys.selectedClientID)
             configuration.useDefaultWineDistribution(id: selectedClient.server.desktopDefaultWineDistributionID)
+            configuration.useDefaultWorkaround3(selectedClient.desktopDefaultWorkaround3)
             restoreClientState()
         }
     }
@@ -83,7 +84,8 @@ final class LauncherViewModel {
         let initialClient = self.channelClients[initialClientID] ?? defaultChannelClient
         configuration = LauncherConfiguration(
             defaults: defaults,
-            defaultWineDistro: initialClient.descriptor.server.desktopDefaultWineDistributionID
+            defaultWineDistro: initialClient.descriptor.server.desktopDefaultWineDistributionID,
+            defaultWorkaround3: initialClient.descriptor.desktopDefaultWorkaround3
         )
         store = ChannelClientStore(defaults: defaults)
         taskQueue = LauncherTaskQueue()

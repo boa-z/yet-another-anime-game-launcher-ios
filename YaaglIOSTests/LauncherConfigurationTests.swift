@@ -11,6 +11,28 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testWorkaround3CanDefaultToDisabledForHK4EGlobalDesktopChannel() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults, defaultWorkaround3: false)
+
+        XCTAssertFalse(configuration.workaround3)
+        XCTAssertFalse(configuration.snapshot.workaround3)
+        XCTAssertNil(defaults.string(forKey: "config_workaround3"))
+    }
+
+    @MainActor
+    func testUnstoredWorkaround3DefaultCanFollowSelectedClient() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults, defaultWorkaround3: true)
+
+        configuration.useDefaultWorkaround3(false)
+
+        XCTAssertFalse(configuration.workaround3)
+        XCTAssertFalse(configuration.snapshot.workaround3)
+        XCTAssertNil(defaults.string(forKey: "config_workaround3"))
+    }
+
+    @MainActor
     func testWorkaround3PersistsToDefaults() {
         let suiteName = "LauncherConfigurationTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
@@ -22,6 +44,18 @@ final class LauncherConfigurationTests: XCTestCase {
 
         XCTAssertFalse(reloadedConfiguration.workaround3)
         XCTAssertFalse(reloadedConfiguration.snapshot.workaround3)
+    }
+
+    @MainActor
+    func testStoredWorkaround3DoesNotFollowSelectedClientDefault() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        configuration.workaround3 = true
+        configuration.useDefaultWorkaround3(false)
+
+        XCTAssertTrue(configuration.workaround3)
+        XCTAssertEqual(defaults.string(forKey: "config_workaround3"), "true")
     }
 
     @MainActor

@@ -102,6 +102,20 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testInitialWorkaround3DefaultUsesSavedSelectedClientDesktopDefault() throws {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        let hk4eGlobal = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hk4e_global" })
+        defaults.set(hk4eGlobal.id, forKey: "selected_client_id")
+
+        let viewModel = makeViewModel(defaults: defaults)
+
+        XCTAssertEqual(viewModel.selectedClientID, hk4eGlobal.id)
+        XCTAssertFalse(viewModel.configuration.workaround3)
+        XCTAssertFalse(viewModel.configuration.snapshot.workaround3)
+        XCTAssertNil(defaults.string(forKey: "config_workaround3"))
+    }
+
+    @MainActor
     func testWineDefaultFollowsClientSwitchUntilStored() throws {
         let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
         let viewModel = makeViewModel(defaults: defaults)
@@ -117,6 +131,38 @@ final class LauncherViewModelTests: XCTestCase {
         viewModel.selectedClientID = cbjq.id
         XCTAssertEqual(viewModel.configuration.wineDistro, cbjq.server.desktopDefaultWineDistributionID)
         XCTAssertNil(defaults.string(forKey: "wine_tag"))
+    }
+
+    @MainActor
+    func testWorkaround3DefaultFollowsHK4EClientSwitchUntilStored() throws {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        let viewModel = makeViewModel(defaults: defaults)
+        let hk4eCN = try XCTUnwrap(viewModel.clients.first { $0.id == "hk4e_cn" })
+        let hk4eGlobal = try XCTUnwrap(viewModel.clients.first { $0.id == "hk4e_global" })
+
+        XCTAssertEqual(viewModel.selectedClientID, hk4eCN.id)
+        XCTAssertTrue(viewModel.configuration.workaround3)
+
+        viewModel.selectedClientID = hk4eGlobal.id
+        XCTAssertFalse(viewModel.configuration.workaround3)
+        XCTAssertNil(defaults.string(forKey: "config_workaround3"))
+
+        viewModel.selectedClientID = hk4eCN.id
+        XCTAssertTrue(viewModel.configuration.workaround3)
+        XCTAssertNil(defaults.string(forKey: "config_workaround3"))
+    }
+
+    @MainActor
+    func testStoredWorkaround3DoesNotFollowClientSwitch() throws {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        defaults.set("true", forKey: "config_workaround3")
+        let viewModel = makeViewModel(defaults: defaults)
+        let hk4eGlobal = try XCTUnwrap(viewModel.clients.first { $0.id == "hk4e_global" })
+
+        viewModel.selectedClientID = hk4eGlobal.id
+
+        XCTAssertTrue(viewModel.configuration.workaround3)
+        XCTAssertEqual(defaults.string(forKey: "config_workaround3"), "true")
     }
 
     @MainActor

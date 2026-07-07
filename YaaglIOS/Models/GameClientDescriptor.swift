@@ -24,6 +24,10 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
 }
 
 extension GameClientDescriptor {
+    var desktopDefaultWorkaround3: Bool {
+        gameType == "hk4e" && releaseType != "os"
+    }
+
     var enforcesDesktopSupportedVersionCeiling: Bool {
         switch gameType {
         case "bh3", "cbjq":
