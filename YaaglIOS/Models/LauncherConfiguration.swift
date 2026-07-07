@@ -162,8 +162,7 @@ final class LauncherConfiguration {
         resolutionWidth = max(1, defaults.integerOrDefault(forKey: Keys.resolutionWidth, defaultValue: 1920))
         resolutionHeight = max(1, defaults.integerOrDefault(forKey: Keys.resolutionHeight, defaultValue: 1920))
         hk4eEnableHDR = Self.loadDesktopBool(defaults, forKey: Keys.hk4eEnableHDR)
-        let storedWineDistro = defaults.string(forKey: Keys.wineDistro) ?? WineDistribution.defaultID
-        if WineDistribution.distribution(id: storedWineDistro) != nil {
+        if let storedWineDistro = defaults.string(forKey: Keys.wineDistro), !storedWineDistro.isEmpty {
             wineDistro = storedWineDistro
         } else {
             wineDistro = WineDistribution.defaultID
@@ -216,6 +215,14 @@ final class LauncherConfiguration {
 
     var selectedWineDistribution: WineDistribution {
         WineDistribution.distribution(id: wineDistro) ?? .defaultDistribution
+    }
+
+    var currentWineDistribution: WineDistribution? {
+        WineDistribution.distribution(id: wineDistro)
+    }
+
+    var wineDistributionOptions: [WineDistribution] {
+        WineDistribution.selectionCatalog(currentID: wineDistro)
     }
 
     var wineDistributionSelection: String {

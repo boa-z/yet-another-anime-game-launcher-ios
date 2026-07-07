@@ -342,13 +342,45 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
-    func testUnknownStoredWineDistributionFallsBackToDefault() {
+    func testUnknownStoredWineDistributionPreservesDesktopCurrentTag() {
         let defaults = makeDefaults()
         defaults.set("unknown-distro", forKey: "wine_tag")
 
         let configuration = LauncherConfiguration(defaults: defaults)
 
-        XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
+        XCTAssertEqual(configuration.wineDistro, "unknown-distro")
+        XCTAssertEqual(configuration.wineDistributionSelection, "unknown-distro")
+        XCTAssertEqual(configuration.snapshot.wineDistro, "unknown-distro")
+        XCTAssertNil(configuration.currentWineDistribution)
+        XCTAssertEqual(configuration.selectedWineDistribution.id, WineDistribution.defaultID)
+        XCTAssertEqual(configuration.wineDistributionOptions.first?.id, "unknown-distro")
+        XCTAssertEqual(configuration.wineDistributionOptions.first?.displayName, "unknown-distro")
+        XCTAssertEqual(configuration.wineDistributionOptions.first?.remoteURL, "not_applicable")
+        XCTAssertEqual(configuration.wineDistributionOptions.first?.renderBackend, "unknown")
+    }
+
+    @MainActor
+    func testUnknownStoredWineDistributionCanQueueAndCancelKnownUpdate() {
+        let defaults = makeDefaults()
+        defaults.set("unknown-distro", forKey: "wine_tag")
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        configuration.requestWineDistributionUpdate(id: "11.8-dxmt-signed-experimental")
+
+        XCTAssertEqual(configuration.wineDistro, "unknown-distro")
+        XCTAssertEqual(configuration.wineState, .update)
+        XCTAssertEqual(configuration.wineDistributionSelection, "11.8-dxmt-signed-experimental")
+        XCTAssertEqual(defaults.string(forKey: "wine_tag"), "unknown-distro")
+        XCTAssertEqual(defaults.string(forKey: "wine_update_tag"), "11.8-dxmt-signed-experimental")
+
+        configuration.requestWineDistributionUpdate(id: "unknown-distro")
+
+        XCTAssertEqual(configuration.wineDistro, "unknown-distro")
+        XCTAssertEqual(configuration.wineState, .ready)
+        XCTAssertEqual(configuration.wineDistributionSelection, "unknown-distro")
+        XCTAssertEqual(defaults.string(forKey: "wine_tag"), "unknown-distro")
+        XCTAssertNil(defaults.string(forKey: "wine_update_tag"))
+        XCTAssertNil(defaults.string(forKey: "wine_update_url"))
     }
 
     @MainActor

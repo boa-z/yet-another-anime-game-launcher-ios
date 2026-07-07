@@ -79,7 +79,27 @@ struct WineDistribution: Identifiable, Hashable, Sendable {
         catalog.first { $0.id == id }
     }
 
+    static func selectionCatalog(currentID: String) -> [WineDistribution] {
+        guard !currentID.isEmpty,
+              distribution(id: currentID) == nil
+        else {
+            return catalog
+        }
+
+        return [unknownCurrentDistribution(id: currentID)] + catalog
+    }
+
     static var defaultDistribution: WineDistribution {
         distribution(id: defaultID) ?? catalog[0]
+    }
+
+    private static func unknownCurrentDistribution(id: String) -> WineDistribution {
+        WineDistribution(
+            id: id,
+            displayName: id,
+            remoteURL: "not_applicable",
+            renderBackend: "unknown",
+            winePath: nil
+        )
     }
 }

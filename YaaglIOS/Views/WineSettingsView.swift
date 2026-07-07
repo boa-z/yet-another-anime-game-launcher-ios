@@ -8,13 +8,13 @@ struct WineSettingsView: View {
 
         Section("Wine") {
             Picker("Wine Distribution", selection: wineDistributionSelection) {
-                ForEach(WineDistribution.catalog) { distribution in
+                ForEach(configuration.wineDistributionOptions) { distribution in
                     Text(distribution.displayName).tag(distribution.id)
                 }
             }
 
-            LabeledContent("Current Tag", value: configuration.selectedWineDistribution.id)
-            LabeledContent("Render Backend", value: configuration.selectedWineDistribution.renderBackend.uppercased())
+            LabeledContent("Current Tag", value: configuration.wineDistro)
+            LabeledContent("Render Backend", value: configuration.currentWineDistribution?.renderBackend.uppercased() ?? "Unknown")
             LabeledContent("Translation Reference", value: translationRuntime.settingsSummary)
             LabeledContent("Translation Plan", value: translationRuntime.stageSummary)
             LabeledContent("Box64 Sources", value: translationRuntime.sourcePathSummary)
