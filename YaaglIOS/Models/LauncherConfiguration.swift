@@ -141,9 +141,12 @@ final class LauncherConfiguration {
     }
 
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private var hasStoredWineDistro: Bool
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, defaultWineDistro: String = WineDistribution.defaultID) {
         self.defaults = defaults
+        let storedWineDistro = defaults.string(forKey: Keys.wineDistro)
+        hasStoredWineDistro = storedWineDistro?.isEmpty == false
         metalHud = Self.loadDesktopBool(defaults, forKey: Keys.metalHud)
         retina = Self.loadDesktopBool(defaults, forKey: Keys.retina)
         leftCmd = Self.loadDesktopBool(defaults, forKey: Keys.leftCmd)
@@ -162,10 +165,10 @@ final class LauncherConfiguration {
         resolutionWidth = max(1, defaults.integerOrDefault(forKey: Keys.resolutionWidth, defaultValue: 1920))
         resolutionHeight = max(1, defaults.integerOrDefault(forKey: Keys.resolutionHeight, defaultValue: 1920))
         hk4eEnableHDR = Self.loadDesktopBool(defaults, forKey: Keys.hk4eEnableHDR)
-        if let storedWineDistro = defaults.string(forKey: Keys.wineDistro), !storedWineDistro.isEmpty {
+        if let storedWineDistro, !storedWineDistro.isEmpty {
             wineDistro = storedWineDistro
         } else {
-            wineDistro = WineDistribution.defaultID
+            wineDistro = Self.nonEmptyWineDistro(defaultWineDistro)
         }
         if let storedWineNetbiosName = defaults.string(forKey: Keys.wineNetbiosName) {
             wineNetbiosName = storedWineNetbiosName
@@ -279,14 +282,22 @@ final class LauncherConfiguration {
         markWineUpdatePending(for: distroID)
     }
 
+    func useDefaultWineDistribution(id distroID: String) {
+        guard !hasStoredWineDistro else {
+            return
+        }
+
+        wineDistro = Self.nonEmptyWineDistro(distroID)
+    }
+
     func completePendingWineUpdateSimulation() {
         guard wineState == .update else {
             return
         }
 
         let completedDistro = WineDistribution.distribution(id: wineUpdateTag)
-        if let completedDistro, wineDistro != completedDistro.id {
-            wineDistro = completedDistro.id
+        if let completedDistro {
+            persistWineDistro(completedDistro.id)
         }
 
         clearPendingWineUpdate()
@@ -320,6 +331,11 @@ final class LauncherConfiguration {
         ignoredLauncherUpdateVersion = ""
     }
 
+    private func persistWineDistro(_ distroID: String) {
+        hasStoredWineDistro = true
+        wineDistro = distroID
+    }
+
     private func markWineUpdatePending(for distroID: String) {
         guard let distribution = WineDistribution.distribution(id: distroID) else {
             clearPendingWineUpdate()
@@ -342,7 +358,9 @@ final class LauncherConfiguration {
     }
 
     private func save(_ value: String, forKey key: String) {
-        defaults.set(value, forKey: key)
+        if key != Keys.wineDistro || hasStoredWineDistro {
+            defaults.set(value, forKey: key)
+        }
     }
 
     private func saveOptionalString(_ value: String, forKey key: String) {
@@ -388,6 +406,10 @@ final class LauncherConfiguration {
         }.joined()
 
         return "DESKTOP-\(suffix)"
+    }
+
+    private static func nonEmptyWineDistro(_ distroID: String) -> String {
+        distroID.isEmpty ? WineDistribution.defaultID : distroID
     }
 }
 

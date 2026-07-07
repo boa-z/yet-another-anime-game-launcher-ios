@@ -26,6 +26,7 @@ final class LauncherViewModel {
             }
 
             defaults.set(selectedClientID, forKey: Keys.selectedClientID)
+            configuration.useDefaultWineDistribution(id: selectedClient.server.desktopDefaultWineDistributionID)
             restoreClientState()
         }
     }
@@ -72,16 +73,22 @@ final class LauncherViewModel {
         self.installProbe = installProbe
         self.launcherUpdateService = launcherUpdateService
         clients = resolvedClients.map(\.descriptor)
-        configuration = LauncherConfiguration(defaults: defaults)
+        let initialClientID: String
+        if let savedClientID = defaults.string(forKey: Keys.selectedClientID),
+           resolvedClients.contains(where: { $0.descriptor.id == savedClientID }) {
+            initialClientID = savedClientID
+        } else {
+            initialClientID = defaultChannelClient.descriptor.id
+        }
+        let initialClient = self.channelClients[initialClientID] ?? defaultChannelClient
+        configuration = LauncherConfiguration(
+            defaults: defaults,
+            defaultWineDistro: initialClient.descriptor.server.desktopDefaultWineDistributionID
+        )
         store = ChannelClientStore(defaults: defaults)
         taskQueue = LauncherTaskQueue()
         backgroundTaskQueue = LauncherTaskQueue()
-        if let savedClientID = defaults.string(forKey: Keys.selectedClientID),
-           resolvedClients.contains(where: { $0.descriptor.id == savedClientID }) {
-            selectedClientID = savedClientID
-        } else {
-            selectedClientID = defaultChannelClient.descriptor.id
-        }
+        selectedClientID = initialClientID
         restoreClientState()
     }
 

@@ -89,6 +89,50 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testInitialWineDefaultUsesSavedSelectedClientDesktopDefault() throws {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        let nap = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "nap_global" })
+        defaults.set(nap.id, forKey: "selected_client_id")
+
+        let viewModel = makeViewModel(defaults: defaults)
+
+        XCTAssertEqual(viewModel.selectedClientID, nap.id)
+        XCTAssertEqual(viewModel.configuration.wineDistro, nap.server.desktopDefaultWineDistributionID)
+        XCTAssertNil(defaults.string(forKey: "wine_tag"))
+    }
+
+    @MainActor
+    func testWineDefaultFollowsClientSwitchUntilStored() throws {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        let viewModel = makeViewModel(defaults: defaults)
+        let nap = try XCTUnwrap(viewModel.clients.first { $0.id == "nap_global" })
+        let cbjq = try XCTUnwrap(viewModel.clients.first { $0.id == "cbjq_global" })
+
+        XCTAssertEqual(viewModel.configuration.wineDistro, viewModel.selectedClient.server.desktopDefaultWineDistributionID)
+
+        viewModel.selectedClientID = nap.id
+        XCTAssertEqual(viewModel.configuration.wineDistro, nap.server.desktopDefaultWineDistributionID)
+        XCTAssertNil(defaults.string(forKey: "wine_tag"))
+
+        viewModel.selectedClientID = cbjq.id
+        XCTAssertEqual(viewModel.configuration.wineDistro, cbjq.server.desktopDefaultWineDistributionID)
+        XCTAssertNil(defaults.string(forKey: "wine_tag"))
+    }
+
+    @MainActor
+    func testStoredWineDistributionDoesNotFollowClientSwitch() throws {
+        let defaults = makeDefaults(suiteName: "YaaglIOSTests.\(UUID().uuidString)")
+        defaults.set("9.9-dxmt", forKey: "wine_tag")
+        let viewModel = makeViewModel(defaults: defaults)
+        let cbjq = try XCTUnwrap(viewModel.clients.first { $0.id == "cbjq_global" })
+
+        viewModel.selectedClientID = cbjq.id
+
+        XCTAssertEqual(viewModel.configuration.wineDistro, "9.9-dxmt")
+        XCTAssertEqual(defaults.string(forKey: "wine_tag"), "9.9-dxmt")
+    }
+
+    @MainActor
     func testPredownloadPromptCanBeDismissed() async {
         let viewModel = makeViewModel()
 

@@ -210,6 +210,48 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testWineDistributionUsesClientDesktopDefaultWithoutPersisting() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(
+            defaults: defaults,
+            defaultWineDistro: "11.0-1-crossover-signed-experimental"
+        )
+
+        XCTAssertEqual(configuration.wineDistro, "11.0-1-crossover-signed-experimental")
+        XCTAssertEqual(configuration.selectedWineDistribution.displayName, "Wine 11.0-1 Crossover (signed, experimental)")
+        XCTAssertNil(defaults.string(forKey: "wine_tag"))
+    }
+
+    @MainActor
+    func testStoredWineDistributionOverridesClientDesktopDefault() {
+        let defaults = makeDefaults()
+        defaults.set("9.9-dxmt", forKey: "wine_tag")
+
+        let configuration = LauncherConfiguration(
+            defaults: defaults,
+            defaultWineDistro: "11.0-1-crossover-signed-experimental"
+        )
+
+        XCTAssertEqual(configuration.wineDistro, "9.9-dxmt")
+
+        configuration.useDefaultWineDistribution(id: "11.0-1-crossover-signed-experimental")
+
+        XCTAssertEqual(configuration.wineDistro, "9.9-dxmt")
+        XCTAssertEqual(defaults.string(forKey: "wine_tag"), "9.9-dxmt")
+    }
+
+    @MainActor
+    func testUnstoredWineDistributionDefaultCanFollowSelectedClient() {
+        let defaults = makeDefaults()
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        configuration.useDefaultWineDistribution(id: "11.0-1-crossover-signed-experimental")
+
+        XCTAssertEqual(configuration.wineDistro, "11.0-1-crossover-signed-experimental")
+        XCTAssertNil(defaults.string(forKey: "wine_tag"))
+    }
+
+    @MainActor
     func testWineNetbiosNameIsGeneratedAndPersistedWithDesktopShape() {
         let defaults = makeDefaults()
         let configuration = LauncherConfiguration(defaults: defaults)
@@ -277,6 +319,28 @@ final class LauncherConfigurationTests: XCTestCase {
         XCTAssertNil(configuration.pendingWineDistribution)
         XCTAssertEqual(defaults.string(forKey: "wine_state"), "ready")
         XCTAssertEqual(defaults.string(forKey: "wine_tag"), "11.8-dxmt-signed-experimental")
+        XCTAssertNil(defaults.string(forKey: "wine_update_tag"))
+        XCTAssertNil(defaults.string(forKey: "wine_update_url"))
+    }
+
+    @MainActor
+    func testCompletingPendingWineUpdatePersistsMatchingUnstoredDefault() {
+        let defaults = makeDefaults()
+        defaults.set("update", forKey: "wine_state")
+        defaults.set(WineDistribution.defaultID, forKey: "wine_update_tag")
+        defaults.set(
+            WineDistribution.defaultDistribution.remoteURL,
+            forKey: "wine_update_url"
+        )
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
+        XCTAssertNil(defaults.string(forKey: "wine_tag"))
+
+        configuration.completePendingWineUpdateSimulation()
+
+        XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
+        XCTAssertEqual(defaults.string(forKey: "wine_tag"), WineDistribution.defaultID)
         XCTAssertNil(defaults.string(forKey: "wine_update_tag"))
         XCTAssertNil(defaults.string(forKey: "wine_update_url"))
     }
