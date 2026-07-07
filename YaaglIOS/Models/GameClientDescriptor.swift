@@ -22,3 +22,19 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
     let secondaryHex: String
     let launchButtonLocation: LaunchButtonLocation
 }
+
+extension GameClientDescriptor {
+    var enforcesDesktopSupportedVersionCeiling: Bool {
+        switch gameType {
+        case "bh3", "cbjq":
+            true
+        default:
+            false
+        }
+    }
+
+    func isAboveDesktopSupportedVersion(_ version: String) -> Bool {
+        enforcesDesktopSupportedVersionCeiling
+            && SemanticVersion(version) > SemanticVersion(currentSupportedVersion)
+    }
+}

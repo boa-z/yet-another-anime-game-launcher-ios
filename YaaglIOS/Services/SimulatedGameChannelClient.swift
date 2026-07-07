@@ -82,7 +82,12 @@ struct SimulatedGameChannelClient: GameChannelClient {
         case .predownload:
             nextState.predownloadedAll = true
             nextState.predownloadedArchiveKeys = PredownloadArchiveMarker.markers(for: descriptor).map(\.key).sorted()
-        case .launch, .checkIntegrity, .initEnvironment:
+        case .launch:
+            guard !launchBlockedByUnsupportedVersion(state: currentState, configuration: context.configuration) else {
+                break
+            }
+            nextState.requiresPatchRevert = false
+        case .checkIntegrity, .initEnvironment:
             nextState.requiresPatchRevert = false
         case .checkLauncherUpdate, .settingsQuickAction:
             break
@@ -115,6 +120,9 @@ struct SimulatedGameChannelClient: GameChannelClient {
         case .existing(let version, let metadata):
             let detectedVersion = SemanticVersion(version)
             let latestVersion = SemanticVersion(descriptor.latestVersion)
+            guard !descriptor.isAboveDesktopSupportedVersion(version) else {
+                return currentState
+            }
             guard detectedVersion >= latestVersion || canUpdate(from: version) else {
                 return currentState
             }
@@ -137,5 +145,14 @@ struct SimulatedGameChannelClient: GameChannelClient {
         } else {
             descriptor.updatableVersions.contains(version)
         }
+    }
+
+    private func launchBlockedByUnsupportedVersion(
+        state: ChannelClientState,
+        configuration: LauncherConfigurationSnapshot
+    ) -> Bool {
+        descriptor.gameType == "cbjq"
+            && descriptor.isAboveDesktopSupportedVersion(state.currentVersion)
+            && !configuration.patchOff
     }
 }

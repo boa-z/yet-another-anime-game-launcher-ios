@@ -488,7 +488,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(updateLogs.contains("update: Seasun pak downloads and manifest.json writes are disabled"))
         XCTAssertTrue(updateLogs.contains("update: stale pak removal, manifest.json rewrite, and patched marker clear are simulated"))
 
-        let launchLogs = try await logs(
+        let blockedLaunchCommands = try await collect(
             service.makeProgram(
                 action: .launch,
                 client: cbjq,
@@ -501,7 +501,29 @@ final class LauncherSimulationServiceTests: XCTestCase {
                 state: installedState(for: cbjq, at: directory)
             )
         )
-        XCTAssertTrue(launchLogs.contains("launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert unless patchOff is enabled"))
+        let blockedLaunchStateTexts = blockedLaunchCommands.compactMap(\.stateText)
+        let blockedLaunchLogs = blockedLaunchCommands.compactMap(\.log)
+
+        XCTAssertTrue(blockedLaunchStateTexts.contains("Unsupported game version 2.1.0"))
+        XCTAssertTrue(blockedLaunchLogs.contains("launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"))
+        XCTAssertFalse(blockedLaunchStateTexts.contains("Game is running (simulation)"))
+        XCTAssertFalse(blockedLaunchLogs.contains { $0.contains("dependency: Jadeite") })
+        XCTAssertFalse(blockedLaunchLogs.contains { $0.contains("launch command preview") })
+
+        let launchLogs = try await logs(
+            service.makeProgram(
+                action: .launch,
+                client: cbjq,
+                configuration: launchSnapshot(
+                    reshade: true,
+                    patchOff: true,
+                    wineDistro: "11.0-dxmt-signed-with-patches"
+                ),
+                installDirectory: directory,
+                state: installedState(for: cbjq, at: directory)
+            )
+        )
+        XCTAssertFalse(launchLogs.contains { $0.contains("unsupported-version alert") })
         XCTAssertTrue(launchLogs.contains("dependency: Jadeite 4.1.0 metadata mirrors installed_jadeite_version; v4.1.0.zip were not downloaded"))
         XCTAssertTrue(launchLogs.contains {
             $0.contains("dependency: Media Foundation mf-install metadata has no desktop installed-version key") &&

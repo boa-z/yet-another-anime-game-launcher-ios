@@ -35,7 +35,7 @@ final class GameSettingsCapabilitiesTests: XCTestCase {
         XCTAssertFalse(GameSettingsCapabilities.none.patchOff)
         XCTAssertFalse(GameSettingsCapabilities.none.blockNet)
 
-        XCTAssertTrue(GameSettingsCapabilities.cbjq.patchOff)
+        XCTAssertFalse(GameSettingsCapabilities.cbjq.patchOff)
         XCTAssertFalse(GameSettingsCapabilities.cbjq.steamPatch)
         XCTAssertFalse(GameSettingsCapabilities.cbjq.blockNet)
         XCTAssertFalse(GameSettingsCapabilities.cbjq.resolution)

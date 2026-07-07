@@ -62,7 +62,7 @@ struct LauncherSimulationService: Sendable {
         case .update:
             updateSteps(client: client, state: state)
         case .launch:
-            launchSteps(client: client, configuration: configuration, installDirectory: installDirectory)
+            launchSteps(client: client, configuration: configuration, installDirectory: installDirectory, state: state)
         case .predownload:
             predownloadSteps(client: client)
         case .checkIntegrity:
@@ -294,6 +294,16 @@ struct LauncherSimulationService: Sendable {
         case .existing(let version, let metadata):
             let detectedVersion = SemanticVersion(version)
             let latestVersion = SemanticVersion(client.latestVersion)
+            if client.isAboveDesktopSupportedVersion(version) {
+                return [
+                    SimulationStep("Reading existing game version", progress: nil),
+                    SimulationStep(
+                        "Unsupported game version \(version)",
+                        progress: 1.0,
+                        log: "import: \(version) is above desktop supported \(client.currentSupportedVersion); virtual install record is unchanged"
+                    )
+                ]
+            }
             if detectedVersion < latestVersion && !canUpdate(client: client, from: version) {
                 return [
                     SimulationStep("Reading existing game version", progress: nil),
@@ -356,8 +366,24 @@ struct LauncherSimulationService: Sendable {
     private func launchSteps(
         client: GameClientDescriptor,
         configuration: LauncherConfigurationSnapshot,
-        installDirectory: String
+        installDirectory: String,
+        state: ChannelClientState
     ) -> [SimulationStep] {
+        if let unsupportedGuardLog = unsupportedLaunchGuardLog(
+            for: client,
+            version: state.currentVersion,
+            configuration: configuration
+        ) {
+            return [
+                SimulationStep("Checking game version", progress: nil),
+                SimulationStep(
+                    "Unsupported game version \(state.currentVersion)",
+                    progress: 1.0,
+                    log: unsupportedGuardLog
+                )
+            ]
+        }
+
         let capabilities = client.gameSettingsCapabilities
         let wineDistribution = WineDistribution.distribution(id: configuration.wineDistro)
         let wineDistroLabel = wineDistribution.map { "\($0.displayName) (\($0.id))" } ?? configuration.wineDistro
@@ -578,14 +604,6 @@ struct LauncherSimulationService: Sendable {
                 log: "launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"
             ))
         case "cbjq":
-            if SemanticVersion(client.latestVersion) > SemanticVersion(client.currentSupportedVersion),
-               !configuration.patchOff {
-                steps.append(SimulationStep(
-                    "Representing unsupported CBJQ launch guard",
-                    progress: 0.2,
-                    log: "launch: CBJQ version \(client.latestVersion) is above desktop supported \(client.currentSupportedVersion); desktop would show unsupported-version alert unless patchOff is enabled"
-                ))
-            }
             if let jadeite = DependencyResource.resource(id: "jadeite") {
                 steps.append(SimulationStep(
                     "Blocked Jadeite dependency download",
@@ -1005,6 +1023,21 @@ struct LauncherSimulationService: Sendable {
         } else {
             client.updatableVersions.contains(version)
         }
+    }
+
+    private func unsupportedLaunchGuardLog(
+        for client: GameClientDescriptor,
+        version: String,
+        configuration: LauncherConfigurationSnapshot
+    ) -> String? {
+        guard client.gameType == "cbjq",
+              client.isAboveDesktopSupportedVersion(version),
+              !configuration.patchOff
+        else {
+            return nil
+        }
+
+        return "launch: CBJQ version \(version) is above desktop supported \(client.currentSupportedVersion); desktop would show unsupported-version alert and skip launch unless patchOff is enabled"
     }
 
     private func requiresMediaFoundation(for client: GameClientDescriptor) -> Bool {

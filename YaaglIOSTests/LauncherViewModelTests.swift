@@ -324,6 +324,31 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testImportExistingCBJQAboveSupportedVersionIsRejected() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let cbjq = try XCTUnwrap(viewModel.clients.first { $0.id == "cbjq_global" })
+        viewModel.selectedClientID = cbjq.id
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/SCZ",
+            probeResult: .existing(version: cbjq.latestVersion)
+        )
+
+        XCTAssertEqual(viewModel.installState, .notInstalled)
+        XCTAssertEqual(viewModel.installDirectory, "")
+        XCTAssertEqual(viewModel.currentVersion, "0.0.0")
+        XCTAssertEqual(viewModel.statusText, "Unsupported game version 2.1.0")
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "import: 2.1.0 is above desktop supported 2.0.0; virtual install record is unchanged"
+        })
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "Import skipped: existing install could not be used"
+        })
+    }
+
+    @MainActor
     func testImportExistingLatestVersionRunsIntegritySimulationThenLaunches() async {
         let viewModel = makeViewModel()
 
@@ -424,6 +449,38 @@ final class LauncherViewModelTests: XCTestCase {
             store.load(for: viewModel.selectedClient.id).virtualInstallMetadata,
             VirtualInstallMetadata(client: viewModel.selectedClient, gameVersion: "5.2.0")
         )
+    }
+
+    @MainActor
+    func testCBJQUnsupportedLaunchIsBlockedBeforeSideEffects() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let cbjq = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "cbjq_global" })
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "iOS Sandbox/VirtualGameData/cbjq_global",
+                currentVersion: cbjq.latestVersion,
+                predownloadedAll: false,
+                requiresPatchRevert: true
+            ),
+            for: cbjq.id
+        )
+        let viewModel = makeViewModel(defaults: defaults)
+        viewModel.selectedClientID = cbjq.id
+
+        await viewModel.runPrimaryAction()
+
+        XCTAssertEqual(viewModel.statusText, "Unsupported game version 2.1.0")
+        XCTAssertEqual(viewModel.alertMessage, "Unsupported game version 2.1.0")
+        XCTAssertTrue(store.load(for: cbjq.id).requiresPatchRevert)
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"
+        })
+        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Launch skipped: unsupported version" })
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Launch simulation complete" })
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message.contains("launch command preview") })
     }
 
     @MainActor

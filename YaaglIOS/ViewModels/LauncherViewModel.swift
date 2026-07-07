@@ -383,6 +383,9 @@ final class LauncherViewModel {
             progress = 1
             taskStatus = .completed(action)
         }
+        if action == .launch, launchWasSkippedForUnsupportedVersion {
+            alertMessage = statusText
+        }
         appendHistory(action, completionMessage(for: action, before: stateBeforeRun, after: nextState))
     }
 
@@ -520,6 +523,9 @@ final class LauncherViewModel {
            before.installState == .installed,
            after.installState == .notInstalled {
             "Update skipped: unsupported version; virtual install record reset"
+        } else if action == .launch,
+                  launchWasSkippedForUnsupportedVersion {
+            "Launch skipped: unsupported version"
         } else if action == .importExisting,
                   before == after,
                   after.installState == .notInstalled {
@@ -537,6 +543,10 @@ final class LauncherViewModel {
         if taskHistory.count > 80 {
             taskHistory.removeLast(taskHistory.count - 80)
         }
+    }
+
+    private var launchWasSkippedForUnsupportedVersion: Bool {
+        statusText.hasPrefix("Unsupported game version ")
     }
 }
 
