@@ -16,6 +16,7 @@ struct ChannelClientStore {
             predownloadedAll: defaults.bool(forKey: predownloadedAllKey(for: clientID)),
             requiresPatchRevert: defaults.bool(forKey: requiresPatchRevertKey(for: clientID)),
             virtualInstallMetadata: virtualInstallMetadata(for: clientID),
+            virtualManifestMetadata: virtualManifestMetadata(for: clientID),
             predownloadedArchiveKeys: predownloadedArchiveKeys(for: clientID)
         )
     }
@@ -27,6 +28,7 @@ struct ChannelClientStore {
         defaults.set(state.predownloadedAll, forKey: predownloadedAllKey(for: clientID))
         defaults.set(state.requiresPatchRevert, forKey: requiresPatchRevertKey(for: clientID))
         saveVirtualInstallMetadata(state.virtualInstallMetadata, for: clientID)
+        saveVirtualManifestMetadata(state.virtualManifestMetadata, for: clientID)
         savePredownloadedArchiveKeys(state.predownloadedArchiveKeys, for: clientID)
     }
 
@@ -37,6 +39,7 @@ struct ChannelClientStore {
         defaults.removeObject(forKey: predownloadedAllKey(for: clientID))
         defaults.removeObject(forKey: requiresPatchRevertKey(for: clientID))
         removeVirtualInstallMetadata(for: clientID)
+        removeVirtualManifestMetadata(for: clientID)
         removePredownloadedArchiveKeys(for: clientID)
     }
 
@@ -118,6 +121,31 @@ struct ChannelClientStore {
         defaults.removeObject(forKey: configSourceServerIDKey(for: clientID))
     }
 
+    private func virtualManifestMetadata(for clientID: String) -> VirtualInstallManifestMetadata? {
+        guard let data = defaults.data(forKey: manifestMetadataKey(for: clientID)) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(VirtualInstallManifestMetadata.self, from: data)
+    }
+
+    private func saveVirtualManifestMetadata(_ metadata: VirtualInstallManifestMetadata?, for clientID: String) {
+        guard let metadata else {
+            removeVirtualManifestMetadata(for: clientID)
+            return
+        }
+
+        guard let data = try? JSONEncoder().encode(metadata) else {
+            removeVirtualManifestMetadata(for: clientID)
+            return
+        }
+        defaults.set(data, forKey: manifestMetadataKey(for: clientID))
+    }
+
+    private func removeVirtualManifestMetadata(for clientID: String) {
+        defaults.removeObject(forKey: manifestMetadataKey(for: clientID))
+    }
+
     private func installStateKey(for clientID: String) -> String {
         "client.\(clientID).install_state"
     }
@@ -164,5 +192,9 @@ struct ChannelClientStore {
 
     private func configSourceServerIDKey(for clientID: String) -> String {
         "client.\(clientID).config.source_server"
+    }
+
+    private func manifestMetadataKey(for clientID: String) -> String {
+        "client.\(clientID).seasun_manifest"
     }
 }

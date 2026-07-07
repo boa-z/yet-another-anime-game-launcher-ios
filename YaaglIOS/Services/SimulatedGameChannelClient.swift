@@ -66,7 +66,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
             nextState.predownloadedAll = false
             nextState.predownloadedArchiveKeys = []
             nextState.requiresPatchRevert = false
-            nextState.virtualInstallMetadata = VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion)
+            applyVirtualMetadata(to: &nextState, version: descriptor.latestVersion, useDescriptorManifestFallback: true)
         case .importExisting:
             nextState = stateAfterImport(currentState: currentState, context: context)
         case .update:
@@ -75,7 +75,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 nextState.predownloadedAll = false
                 nextState.predownloadedArchiveKeys = []
                 nextState.requiresPatchRevert = false
-                nextState.virtualInstallMetadata = VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion)
+                applyVirtualMetadata(to: &nextState, version: descriptor.latestVersion, useDescriptorManifestFallback: true)
             } else {
                 nextState = .empty
             }
@@ -112,12 +112,16 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 currentVersion: descriptor.latestVersion,
                 predownloadedAll: false,
                 requiresPatchRevert: false,
-                virtualInstallMetadata: VirtualInstallMetadata(client: descriptor, gameVersion: descriptor.latestVersion),
+                virtualInstallMetadata: virtualConfigMetadata(version: descriptor.latestVersion),
+                virtualManifestMetadata: virtualManifestMetadata(
+                    version: descriptor.latestVersion,
+                    useDescriptorFallback: true
+                ),
                 predownloadedArchiveKeys: []
             )
         case .unreadable:
             return currentState
-        case .existing(let version, let metadata):
+        case .existing(let version, let metadata, let manifestMetadata):
             let detectedVersion = SemanticVersion(version)
             let latestVersion = SemanticVersion(descriptor.latestVersion)
             guard !descriptor.isAboveDesktopSupportedVersion(version) else {
@@ -133,10 +137,54 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 currentVersion: version,
                 predownloadedAll: false,
                 requiresPatchRevert: false,
-                virtualInstallMetadata: metadata ?? VirtualInstallMetadata(client: descriptor, gameVersion: version),
+                virtualInstallMetadata: virtualConfigMetadata(version: version, metadata: metadata),
+                virtualManifestMetadata: virtualManifestMetadata(
+                    version: version,
+                    manifestMetadata: manifestMetadata,
+                    useDescriptorFallback: false
+                ),
                 predownloadedArchiveKeys: []
             )
         }
+    }
+
+    private func applyVirtualMetadata(
+        to state: inout ChannelClientState,
+        version: String,
+        useDescriptorManifestFallback: Bool
+    ) {
+        state.virtualInstallMetadata = virtualConfigMetadata(version: version)
+        state.virtualManifestMetadata = virtualManifestMetadata(
+            version: version,
+            useDescriptorFallback: useDescriptorManifestFallback
+        )
+    }
+
+    private func virtualConfigMetadata(
+        version: String,
+        metadata: VirtualInstallMetadata? = nil
+    ) -> VirtualInstallMetadata? {
+        if descriptor.gameType == "cbjq" {
+            return nil
+        }
+        return metadata ?? VirtualInstallMetadata(client: descriptor, gameVersion: version)
+    }
+
+    private func virtualManifestMetadata(
+        version: String,
+        manifestMetadata: VirtualInstallManifestMetadata? = nil,
+        useDescriptorFallback: Bool
+    ) -> VirtualInstallManifestMetadata? {
+        guard descriptor.gameType == "cbjq" else {
+            return nil
+        }
+        if let manifestMetadata {
+            return manifestMetadata
+        }
+        guard useDescriptorFallback else {
+            return nil
+        }
+        return VirtualInstallManifestMetadata(client: descriptor, projectVersion: version)
     }
 
     private func canUpdate(from version: String) -> Bool {

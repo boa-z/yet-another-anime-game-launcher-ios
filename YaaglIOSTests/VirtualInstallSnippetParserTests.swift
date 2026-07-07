@@ -22,11 +22,12 @@ final class VirtualInstallSnippetParserTests: XCTestCase {
         XCTAssertEqual(result.source, .configINI)
         XCTAssertEqual(result.message, "Detected 5.3.0 from config.ini")
 
-        guard case .existing(let version, let metadata) = result.probeResult else {
+        guard case .existing(let version, let metadata, let manifestMetadata) = result.probeResult else {
             return XCTFail("Expected an existing virtual install probe result")
         }
 
         XCTAssertEqual(version, "5.3.0")
+        XCTAssertNil(manifestMetadata)
         XCTAssertEqual(
             metadata,
             VirtualInstallMetadata(
@@ -76,7 +77,26 @@ final class VirtualInstallSnippetParserTests: XCTestCase {
               "version": "2.1.0.83",
               "projectVersion": "2.1.0",
               "pathOffset": "assets",
-              "paks": []
+              "paks": [
+                {
+                  "name": "game_a.pak",
+                  "hash": "hash-a",
+                  "sizeInBytes": 100,
+                  "bPrimary": true,
+                  "base": "base-a",
+                  "diff": "diff-a",
+                  "diffSizeBytes": "10"
+                },
+                {
+                  "name": "game_b.pak",
+                  "hash": "hash-b",
+                  "sizeInBytes": "200",
+                  "bPrimary": false,
+                  "base": "base-b",
+                  "diff": "diff-b",
+                  "diffSizeBytes": "20"
+                }
+              ]
             }
             """,
             for: client
@@ -84,6 +104,44 @@ final class VirtualInstallSnippetParserTests: XCTestCase {
 
         XCTAssertEqual(result.source, .manifestJSON)
         XCTAssertEqual(result.detectedVersion, "2.1.0")
+
+        guard case .existing(let version, let metadata, let parsedManifestMetadata) = result.probeResult else {
+            return XCTFail("Expected an existing virtual install probe result")
+        }
+
+        XCTAssertEqual(version, "2.1.0")
+        XCTAssertNil(metadata)
+        let manifestMetadata = try XCTUnwrap(parsedManifestMetadata)
+        XCTAssertEqual(manifestMetadata.manifestVersion, "2.1.0.83")
+        XCTAssertEqual(manifestMetadata.projectVersion, "2.1.0")
+        XCTAssertEqual(manifestMetadata.pathOffset, "assets")
+        XCTAssertEqual(manifestMetadata.pakCount, 2)
+        XCTAssertEqual(manifestMetadata.payloadBytes, 300)
+        XCTAssertEqual(manifestMetadata.sourceServerID, client.serverID)
+        XCTAssertEqual(manifestMetadata.channel, client.server.desktopServerChannel)
+        XCTAssertEqual(
+            manifestMetadata.paks,
+            [
+                VirtualInstallManifestMetadata.Pak(
+                    name: "game_a.pak",
+                    hash: "hash-a",
+                    sizeInBytes: 100,
+                    bPrimary: true,
+                    base: "base-a",
+                    diff: "diff-a",
+                    diffSizeBytes: "10"
+                ),
+                VirtualInstallManifestMetadata.Pak(
+                    name: "game_b.pak",
+                    hash: "hash-b",
+                    sizeInBytes: 200,
+                    bPrimary: false,
+                    base: "base-b",
+                    diff: "diff-b",
+                    diffSizeBytes: "20"
+                )
+            ]
+        )
     }
 
     @MainActor

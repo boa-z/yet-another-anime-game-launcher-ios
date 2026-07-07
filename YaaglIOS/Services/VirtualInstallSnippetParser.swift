@@ -115,6 +115,14 @@ struct VirtualInstallSnippetParser: Sendable {
         for keyPath in versionKeyPaths {
             if let rawVersion = stringValue(at: keyPath, in: object),
                let version = normalizedVersion(rawVersion) {
+                if keyPath == ["projectVersion"], client.gameType == "cbjq" {
+                    return detected(
+                        version,
+                        manifestMetadata: seasunManifestMetadata(in: object, version: version, for: client),
+                        source: .manifestJSON
+                    )
+                }
+
                 return detected(version, metadata: VirtualInstallMetadata(client: client, gameVersion: version), source: .manifestJSON)
             }
         }
@@ -203,6 +211,61 @@ struct VirtualInstallSnippetParser: Sendable {
             .compactMap(normalizedVersion)
     }
 
+    private func seasunManifestMetadata(
+        in object: [String: Any],
+        version: String,
+        for client: GameClientDescriptor
+    ) -> VirtualInstallManifestMetadata? {
+        let rawPaks = object["paks"] as? [[String: Any]]
+        let paks = rawPaks?.compactMap(seasunPakMetadata) ?? []
+        let manifestVersion = plainStringValue(from: object["version"])
+            ?? client.server.manifestVersion
+        let pathOffset = plainStringValue(from: object["pathOffset"])
+            ?? client.server.manifestPathOffset
+        let expectedPakCount = rawPaks?.count ?? client.server.manifestPakCount
+        let expectedPayloadBytes = rawPaks == nil
+            ? client.server.manifestPayloadBytes.map(Int64.init)
+            : paks.reduce(0) { $0 + $1.sizeInBytes }
+
+        guard let manifestVersion,
+              let pathOffset,
+              let expectedPakCount,
+              let expectedPayloadBytes
+        else {
+            return nil
+        }
+
+        return VirtualInstallManifestMetadata(
+            manifestVersion: manifestVersion,
+            projectVersion: version,
+            pathOffset: pathOffset,
+            paks: paks,
+            sourceServerID: client.serverID,
+            channel: client.server.desktopServerChannel,
+            expectedPakCount: expectedPakCount,
+            expectedPayloadBytes: expectedPayloadBytes
+        )
+    }
+
+    private func seasunPakMetadata(in object: [String: Any]) -> VirtualInstallManifestMetadata.Pak? {
+        guard let name = plainStringValue(from: object["name"]),
+              let hash = plainStringValue(from: object["hash"]),
+              let sizeInBytes = integerValue(from: object["sizeInBytes"])
+        else {
+            return nil
+        }
+
+        return VirtualInstallManifestMetadata.Pak(
+            name: name,
+            hash: hash,
+            sizeInBytes: sizeInBytes,
+            bPrimary: boolValue(from: object["bPrimary"]) ?? false,
+            base: plainStringValue(from: object["base"]) ?? "",
+            diff: plainStringValue(from: object["diff"]) ?? "",
+            diffSizeBytes: plainStringValue(from: object["diffSizeBytes"]) ?? ""
+        )
+    }
+
     private func stringValue(at keyPath: [String], in object: [String: Any]) -> String? {
         var current: Any = object
         for key in keyPath {
@@ -214,6 +277,52 @@ struct VirtualInstallSnippetParser: Sendable {
             current = next
         }
         return current as? String
+    }
+
+    private func plainStringValue(from rawValue: Any?) -> String? {
+        if let stringValue = rawValue as? String {
+            return normalizedPlainString(stringValue)
+        }
+        if let numberValue = rawValue as? NSNumber {
+            return normalizedPlainString(numberValue.stringValue)
+        }
+        return nil
+    }
+
+    private func normalizedPlainString(_ rawValue: String) -> String? {
+        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+        return trimmedValue.isEmpty ? nil : trimmedValue
+    }
+
+    private func integerValue(from rawValue: Any?) -> Int64? {
+        if let intValue = rawValue as? Int {
+            return Int64(intValue)
+        }
+        if let numberValue = rawValue as? NSNumber {
+            return numberValue.int64Value
+        }
+        if let stringValue = rawValue as? String {
+            return Int64(stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
+    }
+
+    private func boolValue(from rawValue: Any?) -> Bool? {
+        if let boolValue = rawValue as? Bool {
+            return boolValue
+        }
+        if let stringValue = rawValue as? String {
+            switch stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "true", "1":
+                return true
+            case "false", "0":
+                return false
+            default:
+                return nil
+            }
+        }
+        return nil
     }
 
     private func normalizedVersion(_ rawValue: String) -> String? {
@@ -252,11 +361,12 @@ struct VirtualInstallSnippetParser: Sendable {
 
     private func detected(
         _ version: String,
-        metadata: VirtualInstallMetadata,
+        metadata: VirtualInstallMetadata? = nil,
+        manifestMetadata: VirtualInstallManifestMetadata? = nil,
         source: VirtualInstallSnippetSource
     ) -> VirtualInstallSnippetProbeResult {
         VirtualInstallSnippetProbeResult(
-            probeResult: .existing(version: version, metadata: metadata),
+            probeResult: .existing(version: version, metadata: metadata, manifestMetadata: manifestMetadata),
             source: source,
             message: "Detected \(version) from \(source.rawValue)"
         )

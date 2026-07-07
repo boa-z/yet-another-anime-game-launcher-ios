@@ -7,6 +7,7 @@ struct VirtualImportSettingsView: View {
     @State private var probeSnippet = ""
     @State private var probeStatus = ""
     @State private var detectedMetadata: VirtualInstallMetadata?
+    @State private var detectedManifestMetadata: VirtualInstallManifestMetadata?
 
     var body: some View {
         Section("Virtual Import") {
@@ -67,12 +68,21 @@ struct VirtualImportSettingsView: View {
         return detectedMetadata
     }
 
+    private var manifestMetadataForImport: VirtualInstallManifestMetadata? {
+        let version = detectedVersion.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard detectedManifestMetadata?.projectVersion == version else {
+            return nil
+        }
+        return detectedManifestMetadata
+    }
+
     private func fillDefaults() {
         importPath = "iOS Sandbox/Imported/\(viewModel.selectedClient.id)"
         detectedVersion = viewModel.selectedClient.latestVersion
         probeSnippet = ""
         probeStatus = ""
         detectedMetadata = nil
+        detectedManifestMetadata = nil
     }
 
     private func parseProbeSnippet() {
@@ -82,21 +92,28 @@ struct VirtualImportSettingsView: View {
         )
         probeStatus = parsedSnippet.message
 
-        if case .existing(let version, let metadata) = parsedSnippet.probeResult {
+        if case .existing(let version, let metadata, let manifestMetadata) = parsedSnippet.probeResult {
             detectedVersion = version
             detectedMetadata = metadata
+            detectedManifestMetadata = manifestMetadata
         } else {
             detectedMetadata = nil
+            detectedManifestMetadata = nil
         }
     }
 
     private func importExisting() {
         let version = detectedVersion.trimmingCharacters(in: .whitespacesAndNewlines)
         let metadata = metadataForImport
+        let manifestMetadata = manifestMetadataForImport
         Task {
             await viewModel.importExistingVirtualInstall(
                 path: importPath,
-                probeResult: .existing(version: version, metadata: metadata)
+                probeResult: .existing(
+                    version: version,
+                    metadata: metadata,
+                    manifestMetadata: manifestMetadata
+                )
             )
         }
     }

@@ -36,6 +36,7 @@ final class LauncherViewModelTests: XCTestCase {
             savedState.virtualInstallMetadata,
             VirtualInstallMetadata(client: viewModel.selectedClient, gameVersion: viewModel.selectedClient.latestVersion)
         )
+        XCTAssertNil(savedState.virtualManifestMetadata)
     }
 
     @MainActor
@@ -58,6 +59,7 @@ final class LauncherViewModelTests: XCTestCase {
             ChannelClientStore(defaults: defaults).load(for: viewModel.selectedClient.id).virtualInstallMetadata,
             VirtualInstallMetadata(client: viewModel.selectedClient, gameVersion: viewModel.selectedClient.latestVersion)
         )
+        XCTAssertNil(ChannelClientStore(defaults: defaults).load(for: viewModel.selectedClient.id).virtualManifestMetadata)
     }
 
     @MainActor
@@ -82,9 +84,11 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.taskHistory.contains {
             $0.message == "update: Seasun manifest diff compares local manifest.json paks by hash, removes stale paks, and downloads missing paks via Aria2"
         })
+        let savedState = ChannelClientStore(defaults: defaults).load(for: cbjq.id)
+        XCTAssertNil(savedState.virtualInstallMetadata)
         XCTAssertEqual(
-            ChannelClientStore(defaults: defaults).load(for: cbjq.id).virtualInstallMetadata,
-            VirtualInstallMetadata(client: cbjq, gameVersion: cbjq.latestVersion)
+            savedState.virtualManifestMetadata,
+            VirtualInstallManifestMetadata(client: cbjq, projectVersion: cbjq.latestVersion)
         )
     }
 
@@ -333,6 +337,50 @@ final class LauncherViewModelTests: XCTestCase {
         )
         XCTAssertTrue(viewModel.taskHistory.contains {
             $0.message == "import: pasted metadata game_version=5.2.0 channel=9 sub_channel=8 cps=<PASTED_CPS> is represented without reading game files"
+        })
+    }
+
+    @MainActor
+    func testImportExistingPersistsParsedCBJQManifestMetadata() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let cbjq = try XCTUnwrap(viewModel.clients.first { $0.id == "cbjq_global" })
+        viewModel.selectedClientID = cbjq.id
+        let manifestMetadata = VirtualInstallManifestMetadata(
+            manifestVersion: "2.0.0.71",
+            projectVersion: cbjq.currentSupportedVersion,
+            pathOffset: "assets",
+            paks: [
+                VirtualInstallManifestMetadata.Pak(
+                    name: "game_a.pak",
+                    hash: "hash-a",
+                    sizeInBytes: 100,
+                    bPrimary: true,
+                    base: "base-a",
+                    diff: "diff-a",
+                    diffSizeBytes: "10"
+                )
+            ],
+            sourceServerID: cbjq.serverID,
+            channel: cbjq.server.desktopServerChannel,
+            expectedPakCount: 1,
+            expectedPayloadBytes: 100
+        )
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/SCZManifest",
+            probeResult: .existing(
+                version: cbjq.currentSupportedVersion,
+                manifestMetadata: manifestMetadata
+            )
+        )
+
+        let savedState = ChannelClientStore(defaults: defaults).load(for: cbjq.id)
+        XCTAssertNil(savedState.virtualInstallMetadata)
+        XCTAssertEqual(savedState.virtualManifestMetadata, manifestMetadata)
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "import: pasted Seasun manifest version=2.0.0.71 projectVersion=\(cbjq.currentSupportedVersion) pathOffset=assets paks=1 payload_bytes=100 is represented without reading game files"
         })
     }
 

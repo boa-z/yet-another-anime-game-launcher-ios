@@ -294,7 +294,7 @@ struct LauncherSimulationService: Sendable {
                     log: "import: existing directory probe failed; virtual install record is unchanged"
                 )
             ]
-        case .existing(let version, let metadata):
+        case .existing(let version, let metadata, let manifestMetadata):
             let detectedVersion = SemanticVersion(version)
             let latestVersion = SemanticVersion(client.latestVersion)
             if client.isAboveDesktopSupportedVersion(version) {
@@ -318,13 +318,10 @@ struct LauncherSimulationService: Sendable {
                 ]
             }
 
-            let metadataStep = metadata.map {
-                SimulationStep(
-                    "Representing imported desktop metadata",
-                    progress: 0.9,
-                    log: importedMetadataLog($0)
-                )
-            }
+            let metadataSteps = importedMetadataSteps(
+                metadata: metadata,
+                manifestMetadata: manifestMetadata
+            )
 
             if detectedVersion < latestVersion {
                 var steps = [
@@ -335,9 +332,7 @@ struct LauncherSimulationService: Sendable {
                         log: "import: existing package at \(installDirectory) requires update"
                     )
                 ]
-                if let metadataStep {
-                    steps.append(metadataStep)
-                }
+                steps.append(contentsOf: metadataSteps)
                 steps.append(SimulationStep("Import simulation complete", progress: 1.0))
                 return steps
             }
@@ -353,17 +348,47 @@ struct LauncherSimulationService: Sendable {
                     log: "integrity: local files were not read or repaired"
                 )
             ]
-            if let metadataStep {
-                steps.append(metadataStep)
-            }
+            steps.append(contentsOf: metadataSteps)
             steps.append(SimulationStep("Import simulation complete", progress: 1.0))
             return steps
         }
     }
 
+    private func importedMetadataSteps(
+        metadata: VirtualInstallMetadata?,
+        manifestMetadata: VirtualInstallManifestMetadata?
+    ) -> [SimulationStep] {
+        var steps = [SimulationStep]()
+        if let metadata {
+            steps.append(
+                SimulationStep(
+                    "Representing imported desktop metadata",
+                    progress: 0.9,
+                    log: importedMetadataLog(metadata)
+                )
+            )
+        }
+
+        if let manifestMetadata {
+            steps.append(
+                SimulationStep(
+                    "Representing imported manifest metadata",
+                    progress: 0.92,
+                    log: importedManifestMetadataLog(manifestMetadata)
+                )
+            )
+        }
+
+        return steps
+    }
+
     private func importedMetadataLog(_ metadata: VirtualInstallMetadata) -> String {
         let cpsDisplayValue = metadata.cpsReference.isEmpty ? "" : "<\(metadata.cpsReference)>"
         return "import: pasted metadata game_version=\(metadata.gameVersion) channel=\(metadata.channelID) sub_channel=\(metadata.subchannelID) cps=\(cpsDisplayValue) is represented without reading game files"
+    }
+
+    private func importedManifestMetadataLog(_ metadata: VirtualInstallManifestMetadata) -> String {
+        "import: pasted Seasun manifest version=\(metadata.manifestVersion) projectVersion=\(metadata.projectVersion) pathOffset=\(metadata.pathOffset) paks=\(metadata.pakCount) payload_bytes=\(metadata.payloadBytes) is represented without reading game files"
     }
 
     private func launchSteps(

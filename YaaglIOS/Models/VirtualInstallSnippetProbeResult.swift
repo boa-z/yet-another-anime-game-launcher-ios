@@ -7,7 +7,7 @@ struct VirtualInstallSnippetProbeResult: Equatable, Sendable {
 
     var detectedVersion: String? {
         switch probeResult {
-        case .existing(let version, _):
+        case .existing(let version, _, _):
             version
         case .newTarget, .unreadable:
             nil

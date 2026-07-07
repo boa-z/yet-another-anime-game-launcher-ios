@@ -415,6 +415,7 @@ final class LauncherViewModel {
             predownloadedAll: persistedState.predownloadedAll,
             requiresPatchRevert: persistedState.requiresPatchRevert,
             virtualInstallMetadata: persistedState.virtualInstallMetadata,
+            virtualManifestMetadata: persistedState.virtualManifestMetadata,
             predownloadedArchiveKeys: persistedState.predownloadedArchiveKeys
         )
     }
@@ -440,17 +441,45 @@ final class LauncherViewModel {
             client: channelClient.descriptor,
             persistedState: storedState
         ) {
-        case .existing(let version, let metadata):
+        case .existing(let version, let metadata, let manifestMetadata):
             var refreshedState = storedState
             refreshedState.currentVersion = version
-            refreshedState.virtualInstallMetadata = metadata ?? VirtualInstallMetadata(
-                client: channelClient.descriptor,
-                gameVersion: version
+            refreshedState.virtualInstallMetadata = virtualConfigMetadata(
+                for: channelClient.descriptor,
+                version: version,
+                metadata: metadata
+            )
+            refreshedState.virtualManifestMetadata = virtualManifestMetadata(
+                for: channelClient.descriptor,
+                storedMetadata: storedState.virtualManifestMetadata,
+                probedMetadata: manifestMetadata
             )
             return refreshedState
         case .newTarget, .unreadable:
             return .empty
         }
+    }
+
+    private func virtualConfigMetadata(
+        for client: GameClientDescriptor,
+        version: String,
+        metadata: VirtualInstallMetadata?
+    ) -> VirtualInstallMetadata? {
+        if client.gameType == "cbjq" {
+            return nil
+        }
+        return metadata ?? VirtualInstallMetadata(client: client, gameVersion: version)
+    }
+
+    private func virtualManifestMetadata(
+        for client: GameClientDescriptor,
+        storedMetadata: VirtualInstallManifestMetadata?,
+        probedMetadata: VirtualInstallManifestMetadata?
+    ) -> VirtualInstallManifestMetadata? {
+        guard client.gameType == "cbjq" else {
+            return nil
+        }
+        return probedMetadata ?? storedMetadata
     }
 
     private var persistedState: ChannelClientState {

@@ -53,7 +53,47 @@ final class ChannelClientStoreTests: XCTestCase {
         XCTAssertEqual(state.installDirectory, "iOS Sandbox/VirtualGameData/hk4e_cn")
         XCTAssertEqual(state.currentVersion, "5.3.0")
         XCTAssertNil(state.virtualInstallMetadata)
+        XCTAssertNil(state.virtualManifestMetadata)
         XCTAssertEqual(state.predownloadedArchiveKeys, [])
+    }
+
+    @MainActor
+    func testPersistsSeasunManifestMetadata() {
+        let store = ChannelClientStore(defaults: makeDefaults())
+        let manifestMetadata = VirtualInstallManifestMetadata(
+            manifestVersion: "2.1.0.83",
+            projectVersion: "2.1.0",
+            pathOffset: "assets",
+            paks: [
+                VirtualInstallManifestMetadata.Pak(
+                    name: "game_a.pak",
+                    hash: "hash-a",
+                    sizeInBytes: 100,
+                    bPrimary: true,
+                    base: "base-a",
+                    diff: "diff-a",
+                    diffSizeBytes: "10"
+                )
+            ],
+            sourceServerID: "cbjq_global",
+            channel: "os",
+            expectedPakCount: 1,
+            expectedPayloadBytes: 100
+        )
+        let savedState = ChannelClientState(
+            installState: .installed,
+            installDirectory: "iOS Sandbox/VirtualGameData/cbjq_global",
+            currentVersion: "2.1.0",
+            predownloadedAll: false,
+            requiresPatchRevert: false,
+            virtualManifestMetadata: manifestMetadata
+        )
+
+        store.save(savedState, for: "cbjq_global")
+
+        XCTAssertEqual(store.load(for: "cbjq_global"), savedState)
+        store.clear(for: "cbjq_global")
+        XCTAssertNil(store.load(for: "cbjq_global").virtualManifestMetadata)
     }
 
     @MainActor

@@ -18,7 +18,8 @@ struct VirtualInstallProbe: Sendable {
 
         return .existing(
             version: persistedState.currentVersion,
-            metadata: persistedState.virtualInstallMetadata
+            metadata: persistedState.virtualInstallMetadata,
+            manifestMetadata: persistedState.virtualManifestMetadata
         )
     }
 }
