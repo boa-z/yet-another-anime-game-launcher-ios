@@ -6,6 +6,7 @@ import Observation
 final class LauncherConfiguration {
     static let defaultAdvancedSettingsUnlockEnabled = LauncherBuildSettings.advancedSettingsUnlockEnabled
     let advancedSettingsUnlockEnabled: Bool
+    let launchUILocale: UILocaleOption
 
     var metalHud: Bool {
         didSet { saveDesktopBoolString(metalHud, forKey: Keys.metalHud) }
@@ -159,7 +160,9 @@ final class LauncherConfiguration {
         proxyEnabled = Self.loadDesktopBool(defaults, forKey: Keys.proxyEnabled)
         proxyHost = defaults.string(forKey: Keys.proxyHost) ?? "127.0.0.1:8080"
         fpsUnlock = FPSUnlockOption.option(forStoredValue: defaults.string(forKey: Keys.fpsUnlock)) ?? .disabled
-        uiLocale = UILocaleOption.option(forStoredValue: defaults.string(forKey: Keys.uiLocale)) ?? .defaultOption
+        let initialUILocale = UILocaleOption.option(forStoredValue: defaults.string(forKey: Keys.uiLocale)) ?? .defaultOption
+        uiLocale = initialUILocale
+        launchUILocale = initialUILocale
         advancedSettingsVisible = advancedSettingsUnlockEnabled && Self.loadDesktopBool(defaults, forKey: Keys.advancedSettingsVisible)
         reshade = Self.loadDesktopBool(defaults, forKey: Keys.reshade)
         patchOff = Self.loadDesktopBool(defaults, forKey: Keys.patchOff)
@@ -267,6 +270,10 @@ final class LauncherConfiguration {
             sidecarAssetName: launcherUpdateSidecarAssetName.isEmpty ? nil : launcherUpdateSidecarAssetName,
             sidecarDownloadURL: launcherUpdateSidecarDownloadURL.isEmpty ? nil : launcherUpdateSidecarDownloadURL
         )
+    }
+
+    var uiLocaleRestartRequired: Bool {
+        uiLocale != launchUILocale
     }
 
     var pendingLauncherUpdateMetadata: LauncherUpdateMetadata? {

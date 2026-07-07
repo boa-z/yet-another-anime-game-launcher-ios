@@ -73,6 +73,25 @@ final class LauncherConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    func testUILocaleRestartRequirementMatchesDesktopCurrentLanguagePrompt() {
+        let defaults = makeDefaults()
+        defaults.set("en", forKey: "config_uiLocale")
+        let configuration = LauncherConfiguration(defaults: defaults)
+
+        XCTAssertEqual(configuration.launchUILocale, .english)
+        XCTAssertFalse(configuration.uiLocaleRestartRequired)
+
+        configuration.uiLocale = .japanese
+
+        XCTAssertTrue(configuration.uiLocaleRestartRequired)
+        XCTAssertEqual(defaults.string(forKey: "config_uiLocale"), "ja_jp")
+
+        configuration.uiLocale = .english
+
+        XCTAssertFalse(configuration.uiLocaleRestartRequired)
+    }
+
+    @MainActor
     func testUILocaleMapsSystemLanguageIdentifiers() {
         XCTAssertEqual(UILocaleOption.option(matchingSystemIdentifier: "zh-Hans-US"), .simplifiedChinese)
         XCTAssertEqual(UILocaleOption.option(matchingSystemIdentifier: "ja-JP"), .japanese)

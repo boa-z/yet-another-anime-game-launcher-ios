@@ -18,6 +18,14 @@ struct AdvancedSettingsView: View {
             }
 
             Toggle("ReShade", isOn: $configuration.reshade)
+            if configuration.reshade, let reshade = DependencyResource.resource(id: "reshade") {
+                LabeledContent("ReShade Desktop Version", value: reshade.currentVersion)
+                LabeledContent("Blocked Artifacts", value: reshade.artifactSummary)
+                LabeledContent("Blocked Desktop Writes", value: "\(reshade.desktopInstallPath), ReShade.ini, game dxgi.dll, game d3dcompiler_47.dll")
+                Text(reshade.iOSAvailabilityNote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
             UnavailableCapabilityView(
                 title: "Patch and Dependency Downloads",

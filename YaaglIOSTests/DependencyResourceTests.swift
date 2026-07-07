@@ -55,4 +55,21 @@ final class DependencyResourceTests: XCTestCase {
         XCTAssertTrue(dxmt.artifactNames.contains("winemetal.so"))
         XCTAssertTrue(dxmt.artifactNames.contains("nvngx.dll"))
     }
+
+    func testReShadeMetadataDocumentsBlockedDesktopInstallerPipeline() throws {
+        let reshade = try XCTUnwrap(DependencyResource.resource(id: "reshade"))
+
+        XCTAssertEqual(reshade.desktopInstallPath, "./reshade")
+        XCTAssertTrue(reshade.artifactNames.contains("ReShade_Setup_5.8.0_Addon.exe"))
+        XCTAssertTrue(reshade.artifactNames.contains("install.exe"))
+        XCTAssertTrue(reshade.artifactNames.contains("install.zip"))
+        XCTAssertTrue(reshade.artifactNames.contains("d3dcompiler_47.dll"))
+        XCTAssertTrue(reshade.artifactNames.contains("ReShade64.dll"))
+        XCTAssertTrue(reshade.artifactNames.contains("dxgi.dll"))
+        XCTAssertTrue(reshade.artifactNames.contains("ReShade.ini"))
+        XCTAssertTrue(reshade.iOSAvailabilityNote.contains("installer extraction"))
+        XCTAssertTrue(reshade.iOSAvailabilityNote.contains("DLL copies"))
+        XCTAssertTrue(reshade.iOSAvailabilityNote.contains("Wine path writes"))
+        XCTAssertTrue(reshade.downloadBlockLog.contains("were not downloaded, extracted, copied, or written"))
+    }
 }

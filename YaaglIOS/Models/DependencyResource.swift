@@ -9,6 +9,29 @@ nonisolated struct DependencyResource: Identifiable, Hashable, Sendable {
     let remoteURLs: [String]
     let desktopInstallPath: String
     let iOSAvailabilityNote: String
+    let blockedOperationDescription: String
+
+    init(
+        id: String,
+        displayName: String,
+        installedVersionKey: String?,
+        currentVersion: String,
+        artifactNames: [String],
+        remoteURLs: [String],
+        desktopInstallPath: String,
+        iOSAvailabilityNote: String,
+        blockedOperationDescription: String = "were not downloaded"
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.installedVersionKey = installedVersionKey
+        self.currentVersion = currentVersion
+        self.artifactNames = artifactNames
+        self.remoteURLs = remoteURLs
+        self.desktopInstallPath = desktopInstallPath
+        self.iOSAvailabilityNote = iOSAvailabilityNote
+        self.blockedOperationDescription = blockedOperationDescription
+    }
 
     var settingsSummary: String {
         if let installedVersionKey {
@@ -24,9 +47,9 @@ nonisolated struct DependencyResource: Identifiable, Hashable, Sendable {
 
     var downloadBlockLog: String {
         if let installedVersionKey {
-            "dependency: \(displayName) \(currentVersion) metadata mirrors \(installedVersionKey); \(artifactSummary) were not downloaded"
+            "dependency: \(displayName) \(currentVersion) metadata mirrors \(installedVersionKey); \(artifactSummary) \(blockedOperationDescription)"
         } else {
-            "dependency: \(displayName) \(currentVersion) metadata has no desktop installed-version key; \(artifactSummary) were not downloaded"
+            "dependency: \(displayName) \(currentVersion) metadata has no desktop installed-version key; \(artifactSummary) \(blockedOperationDescription)"
         }
     }
 
@@ -87,13 +110,14 @@ nonisolated struct DependencyResource: Identifiable, Hashable, Sendable {
             displayName: "ReShade",
             installedVersionKey: "installed_reshade",
             currentVersion: "5.8.0",
-            artifactNames: ["ReShade_Setup_5.8.0_Addon.exe", "d3dcompiler_47.dll", "ReShade64.dll", "ReShade.ini"],
+            artifactNames: ["ReShade_Setup_5.8.0_Addon.exe", "install.exe", "install.zip", "d3dcompiler_47.dll", "ReShade64.dll", "dxgi.dll", "ReShade.ini"],
             remoteURLs: [
                 "https://reshade.me/downloads/ReShade_Setup_5.8.0_Addon.exe",
                 "https://lutris.net/files/tools/dll/d3dcompiler_47.dll"
             ],
             desktopInstallPath: "./reshade",
-            iOSAvailabilityNote: "metadata only; installer extraction and Wine path writes are disabled"
+            iOSAvailabilityNote: "metadata only; installer extraction, DLL copies, and Wine path writes are disabled",
+            blockedOperationDescription: "were not downloaded, extracted, copied, or written"
         ),
         DependencyResource(
             id: "media-foundation",

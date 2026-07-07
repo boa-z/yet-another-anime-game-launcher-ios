@@ -76,7 +76,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch: would execute C:\\windows\\system32\\steam.exe with YuanShen.exe"))
         XCTAssertTrue(logs.contains("launch command preview: ./wine/bin/wine64 C:\\\\windows\\\\system32\\\\steam.exe YuanShen.exe (not executed)"))
         let reshadeBlockLog = "dependency: ReShade 5.8.0 metadata mirrors installed_reshade; " +
-            "ReShade_Setup_5.8.0_Addon.exe, d3dcompiler_47.dll, ReShade64.dll, ReShade.ini were not downloaded"
+            "ReShade_Setup_5.8.0_Addon.exe, install.exe, install.zip, d3dcompiler_47.dll, ReShade64.dll, dxgi.dll, ReShade.ini were not downloaded, extracted, copied, or written"
         XCTAssertTrue(logs.contains(reshadeBlockLog))
         XCTAssertTrue(logs.contains("launch: HK4E HDR registry revert WINDOWS_HDR_ON_h3132281285=- is simulated"))
         XCTAssertTrue(logs.contains("launch: HK4E resolution registry revert Screenmanager Is Fullscreen mode_h3981298716, Screenmanager Resolution Width_h182942802, Screenmanager Resolution Height_h2627697771 is simulated"))

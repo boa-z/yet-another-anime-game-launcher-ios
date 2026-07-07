@@ -29,6 +29,11 @@ struct GeneralSettingsView: View {
                     Text(locale.title).tag(locale)
                 }
             }
+            if configuration.uiLocaleRestartRequired {
+                Text("Restart the launcher to apply the selected UI language.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
             Button {
                 registerVersionTap()
