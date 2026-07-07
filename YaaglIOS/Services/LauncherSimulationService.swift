@@ -240,6 +240,9 @@ struct LauncherSimulationService: Sendable {
     private func predownloadArchiveMarkerLog(for client: GameClientDescriptor) -> String {
         let markerKeys = PredownloadArchiveMarker.markers(for: client).map(\.key)
         guard !markerKeys.isEmpty else {
+            if client.gameType == "nap" || client.gameType == "hkrpg" || client.gameType == "bh3" {
+                return "predownload: Aria2 archive basenames are unavailable; no per-archive marker keys are simulated"
+            }
             return "predownload: \(client.gameType) pipeline does not use per-archive marker keys"
         }
 

@@ -1,6 +1,18 @@
 import Foundation
 
 enum GameLibrary {
+    static func clients(
+        applying runtimeMetadataProvider: GameClientRuntimeMetadataProvider = .none
+    ) -> [GameClientDescriptor] {
+        defaultClients.map { client in
+            guard let metadata = runtimeMetadataProvider.metadata(for: client) else {
+                return client
+            }
+
+            return client.applying(runtimeMetadata: metadata)
+        }
+    }
+
     static let defaultClients: [GameClientDescriptor] = [
         GameClientDescriptor(
             id: "hk4e_cn",

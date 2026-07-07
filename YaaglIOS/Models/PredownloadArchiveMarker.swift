@@ -9,26 +9,7 @@ struct PredownloadArchiveMarker: Equatable, Hashable, Sendable {
     }
 
     static func markers(for client: GameClientDescriptor) -> [PredownloadArchiveMarker] {
-        guard usesAria2ArchiveMarkers(client) else {
-            return []
-        }
-
-        let targetVersion = client.predownloadVersion ?? client.latestVersion
-        let versionPair = "\(client.currentSupportedVersion)_to_\(targetVersion)"
-
-        return [
-            PredownloadArchiveMarker(basename: "\(client.serverID)_\(versionPair)_game.zip"),
-            PredownloadArchiveMarker(basename: "\(client.serverID)_\(versionPair)_voice_pack.zip")
-        ]
-    }
-
-    private static func usesAria2ArchiveMarkers(_ client: GameClientDescriptor) -> Bool {
-        switch client.gameType {
-        case "nap", "hkrpg", "bh3":
-            true
-        default:
-            false
-        }
+        client.predownloadArchiveBasenames.map(PredownloadArchiveMarker.init(basename:))
     }
 
     private static func sha1Prefix32(for basename: String) -> String {

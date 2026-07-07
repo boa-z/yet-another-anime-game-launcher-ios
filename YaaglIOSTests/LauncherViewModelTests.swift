@@ -770,7 +770,14 @@ final class LauncherViewModelTests: XCTestCase {
     func testPredownloadPersistsPerArchiveMarkersForAria2Clients() async throws {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
-        let nap = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "nap_global" })
+        let nap = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "nap_global" }).applying(
+            runtimeMetadata: GameClientRuntimeMetadata(
+                predownloadArchiveBasenames: [
+                    "nap_3.0.0_3.1.0_game.zip",
+                    "nap_3.0.0_3.1.0_audio_en-us.zip"
+                ]
+            )
+        )
         let viewModel = LauncherViewModel(
             defaults: defaults,
             channelClients: [
