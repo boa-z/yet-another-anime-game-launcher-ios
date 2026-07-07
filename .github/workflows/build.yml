@@ -20,6 +20,11 @@ on:
         type: boolean
         required: false
         default: false
+      release__nightly:
+        description: LiveContainer-compatible alias for publishing or replacing the nightly release
+        type: boolean
+        required: false
+        default: false
       marketing_version:
         description: Marketing version to stamp into CI archives
         type: string
@@ -119,6 +124,7 @@ jobs:
       archive_artifact: ${{ steps.build_metadata.outputs.archive_artifact }}
       ipa_artifact: ${{ steps.build_metadata.outputs.ipa_artifact }}
       build_number: ${{ steps.build_metadata.outputs.build_number }}
+      commit_sha: ${{ steps.build_metadata.outputs.commit_sha }}
       short_sha: ${{ steps.build_metadata.outputs.short_sha }}
     steps:
       - uses: maxim-lobanov/setup-xcode@v1
@@ -132,9 +138,11 @@ jobs:
         id: metadata
         run: |
           set -eu
-          short_sha="${GITHUB_SHA::7}"
+          commit_sha="$(git rev-parse HEAD)"
+          short_sha="$(git rev-parse --short=7 HEAD)"
           build_number="${GITHUB_RUN_NUMBER}"
           artifact_stem="${scheme}-${marketing_version}.${build_number}-${short_sha}"
+          echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
           echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
           echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
           echo "archive_artifact=${artifact_stem}.xcarchive.tar" >> "$GITHUB_OUTPUT"
@@ -202,6 +210,7 @@ jobs:
           echo "archive_artifact=${{ steps.metadata.outputs.archive_artifact }}" >> "$GITHUB_OUTPUT"
           echo "ipa_artifact=${{ steps.metadata.outputs.ipa_artifact }}" >> "$GITHUB_OUTPUT"
           echo "build_number=${{ steps.metadata.outputs.build_number }}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=${{ steps.metadata.outputs.commit_sha }}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${{ steps.metadata.outputs.short_sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload archive artifact
@@ -225,12 +234,15 @@ jobs:
     permissions:
       contents: write
     if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.release_nightly) ||
+      (github.event_name == 'workflow_dispatch' && (inputs.release_nightly || inputs.release__nightly)) ||
       (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     concurrency:
       group: release-nightly
       cancel-in-progress: true
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Download unsigned IPA
         uses: actions/download-artifact@v4
         with:
@@ -243,17 +255,21 @@ jobs:
 
       - name: Resolve release metadata
         id: release_metadata
-        env:
-          EVENT_HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           set -eu
-          commit_message="${EVENT_HEAD_COMMIT_MESSAGE:-Manual workflow dispatch}"
+          commit_message="$(git log -1 --pretty=%B)"
           delimiter="$(uuidgen)"
           {
             echo "commit_message<<$delimiter"
             echo "$commit_message"
             echo "$delimiter"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Move nightly tag
+        run: |
+          set -eu
+          git tag -f nightly "${{ needs.build.outputs.commit_sha }}"
+          git push --force origin refs/tags/nightly
 
       - name: Publish nightly release
         uses: softprops/action-gh-release@v3
@@ -264,7 +280,62 @@ jobs:
           make_latest: false
           overwrite_files: true
           body: |
-            **Commit:** ${{ github.sha }}
+            **Commit:** ${{ needs.build.outputs.commit_sha }}
+            **Message:** ${{ steps.release_metadata.outputs.commit_message }}
+            **Build:** ${{ env.marketing_version }} (${{ needs.build.outputs.build_number }})
+            **Short SHA:** ${{ needs.build.outputs.short_sha }}
+
+            Built from ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}.
+          files: |
+            ${{ needs.build.outputs.ipa_artifact }}
+            ${{ needs.build.outputs.archive_artifact }}
+
+  release_tag:
+    name: Tagged Release
+    runs-on: ubuntu-latest
+    needs: [build]
+    permissions:
+      contents: write
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    concurrency:
+      group: release-tag-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download unsigned IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.ipa_artifact }}
+
+      - name: Download archive
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.archive_artifact }}
+
+      - name: Resolve release metadata
+        id: release_metadata
+        run: |
+          set -eu
+          commit_message="$(git log -1 --pretty=%B)"
+          delimiter="$(uuidgen)"
+          {
+            echo "commit_message<<$delimiter"
+            echo "$commit_message"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish tagged release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: legacy
+          overwrite_files: true
+          body: |
+            **Commit:** ${{ needs.build.outputs.commit_sha }}
             **Message:** ${{ steps.release_metadata.outputs.commit_message }}
             **Build:** ${{ env.marketing_version }} (${{ needs.build.outputs.build_number }})
             **Short SHA:** ${{ needs.build.outputs.short_sha }}
