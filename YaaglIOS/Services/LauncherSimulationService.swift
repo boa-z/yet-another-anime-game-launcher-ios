@@ -425,6 +425,14 @@ struct LauncherSimulationService: Sendable {
             ))
         }
 
+        if let protonExtrasLog = protonExtrasCopyPlanLog(for: client) {
+            steps.append(SimulationStep(
+                "Simulating Proton extras copy plan",
+                progress: 0.14,
+                log: protonExtrasLog
+            ))
+        }
+
         steps.append(contentsOf: clientLaunchPlanSteps(
             client: client,
             configuration: configuration,
@@ -652,6 +660,13 @@ struct LauncherSimulationService: Sendable {
                     log: dxmt.downloadBlockLog
                 ))
             }
+            if let copyTargetLog = dxmtCopyTargetPlanLog(for: client) {
+                steps.append(SimulationStep(
+                    "Simulating DXMT copy targets",
+                    progress: 0.23,
+                    log: copyTargetLog
+                ))
+            }
             steps.append(SimulationStep(
                 "Applying DXMT environment",
                 progress: 0.23,
@@ -694,6 +709,8 @@ struct LauncherSimulationService: Sendable {
             "launch: WINEMSYNC=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         case "cbjq":
             "launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
+        case "bh3":
+            "launch: WINEMSYNC=1; DXMT_LOG_PATH=./; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         default:
             "launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"
         }
@@ -852,6 +869,28 @@ struct LauncherSimulationService: Sendable {
         }
 
         return "launch: desktop removed-file patch plan moves \(client.server.removedFiles.joined(separator: ", ")) to .bak and restores them after exit"
+    }
+
+    private func protonExtrasCopyPlanLog(for client: GameClientDescriptor) -> String? {
+        switch client.gameType {
+        case "hk4e", "nap", "bh3":
+            "launch: desktop protonextras copy plan maps steam64.exe -> system32/steam.exe, steam32.exe -> syswow64/steam.exe, lsteamclient64.dll -> system32/lsteamclient.dll, lsteamclient32.dll -> syswow64/lsteamclient.dll (not copied on iOS)"
+        default:
+            nil
+        }
+    }
+
+    private func dxmtCopyTargetPlanLog(for client: GameClientDescriptor) -> String? {
+        switch client.gameType {
+        case "hk4e", "nap", "bh3":
+            "launch: desktop DXMT copy plan backs up d3d10core.dll, d3d11.dll, dxgi.dll in ./wine/lib/wine/x86_64-windows; copies winemetal.dll to x86_64-windows and system32, winemetal.so to x86_64-unix (not copied on iOS)"
+        case "hkrpg":
+            "launch: desktop DXMT copy plan backs up d3d10core.dll, d3d11.dll, dxgi.dll in ./wine/lib/wine/x86_64-windows; copies winemetal.dll to x86_64-windows and system32, winemetal.so to x86_64-unix, nvngx.dll to x86_64-windows and system32 (not copied on iOS)"
+        case "cbjq":
+            "launch: desktop CBJQ DXMT copy plan backs up d3d10core.dll, d3d11.dll, dxgi.dll in Wine prefix system32 only; winemetal, nvngx, and protonextras are not used (not copied on iOS)"
+        default:
+            nil
+        }
     }
 
     private func updateSteps(client: GameClientDescriptor, state: ChannelClientState) -> [SimulationStep] {
@@ -1030,14 +1069,13 @@ struct LauncherSimulationService: Sendable {
         version: String,
         configuration: LauncherConfigurationSnapshot
     ) -> String? {
-        guard client.gameType == "cbjq",
-              client.isAboveDesktopSupportedVersion(version),
+        guard client.isAboveDesktopSupportedVersion(version),
               !configuration.patchOff
         else {
             return nil
         }
 
-        return "launch: CBJQ version \(version) is above desktop supported \(client.currentSupportedVersion); desktop would show unsupported-version alert and skip launch unless patchOff is enabled"
+        return "launch: \(client.gameType.uppercased()) version \(version) is above desktop supported \(client.currentSupportedVersion); desktop would show unsupported-version alert and skip launch unless patchOff is enabled"
     }
 
     private func requiresMediaFoundation(for client: GameClientDescriptor) -> Bool {

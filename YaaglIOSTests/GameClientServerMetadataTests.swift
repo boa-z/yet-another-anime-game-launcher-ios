@@ -8,6 +8,7 @@ final class GameClientServerMetadataTests: XCTestCase {
         let hk4eCN = try XCTUnwrap(clients["hk4e_cn"]?.server)
         let napGlobal = try XCTUnwrap(clients["nap_global"]?.server)
         let hkrpgGlobal = try XCTUnwrap(clients["hkrpg_global"]?.server)
+        let bh3 = try XCTUnwrap(clients["bh3_global"])
         let bh3Global = try XCTUnwrap(clients["bh3_global"]?.server)
         let cbjqGlobal = try XCTUnwrap(clients["cbjq_global"]?.server)
         let cbjqCN = try XCTUnwrap(clients["cbjq_cn"]?.server)
@@ -35,6 +36,7 @@ final class GameClientServerMetadataTests: XCTestCase {
         XCTAssertEqual(napGlobal.desktopDefaultWineDistributionID, "11.0-1-crossover-signed-experimental")
         XCTAssertEqual(napGlobal.blockNetHost, "globaldp-prod-os01.zenlesszonezero.com")
         XCTAssertEqual(napGlobal.blockNetDurationSeconds, 20)
+        XCTAssertEqual(napGlobal.removedFiles, ["ZenlessZoneZero_Data/Plugins/x86_64/vulkan-1.dll"])
 
         XCTAssertEqual(hkrpgGlobal.channelID, 1)
         XCTAssertEqual(hkrpgGlobal.subchannelID, 1)
@@ -43,7 +45,15 @@ final class GameClientServerMetadataTests: XCTestCase {
         XCTAssertEqual(hkrpgGlobal.desktopDefaultWineDistributionID, "11.0-1-crossover-signed-experimental")
         XCTAssertEqual(hkrpgGlobal.blockNetHost, "globaldp-prod-os01.starrails.com")
         XCTAssertEqual(hkrpgGlobal.blockNetDurationSeconds, 15)
+        XCTAssertEqual(
+            hkrpgGlobal.removedFiles,
+            [
+                "StarRail_Data/Plugins/x86_64/crashreport.exe",
+                "StarRail_Data/Plugins/x86_64/vulkan-1.dll"
+            ]
+        )
 
+        XCTAssertEqual(bh3.currentSupportedVersion, "7.5.0")
         XCTAssertEqual(bh3Global.channelID, 0)
         XCTAssertEqual(bh3Global.subchannelID, 0)
         XCTAssertEqual(bh3Global.cpsDisplayValue, "")

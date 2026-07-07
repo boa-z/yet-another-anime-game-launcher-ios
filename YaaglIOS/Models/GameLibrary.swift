@@ -86,7 +86,10 @@ enum GameLibrary {
                 desktopDefaultWineDistributionID: "11.0-1-crossover-signed-experimental",
                 blockNetHost: "globaldp-prod-cn01.bhsr.com",
                 blockNetDurationSeconds: 15,
-                removedFiles: []
+                removedFiles: [
+                    "StarRail_Data/Plugins/x86_64/crashreport.exe",
+                    "StarRail_Data/Plugins/x86_64/vulkan-1.dll"
+                ]
             ),
             gameType: "hkrpg",
             releaseType: "cn",
@@ -117,7 +120,10 @@ enum GameLibrary {
                 desktopDefaultWineDistributionID: "11.0-1-crossover-signed-experimental",
                 blockNetHost: "globaldp-prod-os01.starrails.com",
                 blockNetDurationSeconds: 15,
-                removedFiles: []
+                removedFiles: [
+                    "StarRail_Data/Plugins/x86_64/crashreport.exe",
+                    "StarRail_Data/Plugins/x86_64/vulkan-1.dll"
+                ]
             ),
             gameType: "hkrpg",
             releaseType: "os",
@@ -148,7 +154,9 @@ enum GameLibrary {
                 desktopDefaultWineDistributionID: "11.0-1-crossover-signed-experimental",
                 blockNetHost: "globaldp-prod-cn02.juequling.com",
                 blockNetDurationSeconds: 20,
-                removedFiles: []
+                removedFiles: [
+                    "ZenlessZoneZero_Data/Plugins/x86_64/vulkan-1.dll"
+                ]
             ),
             gameType: "nap",
             releaseType: "cn",
@@ -179,7 +187,9 @@ enum GameLibrary {
                 desktopDefaultWineDistributionID: "11.0-1-crossover-signed-experimental",
                 blockNetHost: "globaldp-prod-os01.zenlesszonezero.com",
                 blockNetDurationSeconds: 20,
-                removedFiles: []
+                removedFiles: [
+                    "ZenlessZoneZero_Data/Plugins/x86_64/vulkan-1.dll"
+                ]
             ),
             gameType: "nap",
             releaseType: "os",
@@ -221,7 +231,7 @@ enum GameLibrary {
             executable: "BH3.exe",
             dataDirectory: "BH3_Data",
             latestVersion: "8.4.0",
-            currentSupportedVersion: "8.4.0",
+            currentSupportedVersion: "7.5.0",
             updatableVersions: ["8.1.0", "8.2.0", "8.3.0"],
             predownloadVersion: nil,
             predownloadAvailable: false,

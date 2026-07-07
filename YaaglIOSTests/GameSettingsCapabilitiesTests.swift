@@ -12,7 +12,7 @@ final class GameSettingsCapabilitiesTests: XCTestCase {
         XCTAssertEqual(clients["nap_global"]?.gameSettingsCapabilities, .nap)
         XCTAssertEqual(clients["hkrpg_cn"]?.gameSettingsCapabilities, .hkrpg)
         XCTAssertEqual(clients["hkrpg_global"]?.gameSettingsCapabilities, .hkrpg)
-        XCTAssertEqual(clients["bh3_global"]?.gameSettingsCapabilities, GameSettingsCapabilities.none)
+        XCTAssertEqual(clients["bh3_global"]?.gameSettingsCapabilities, .bh3)
         XCTAssertEqual(clients["cbjq_global"]?.gameSettingsCapabilities, .cbjq)
         XCTAssertEqual(clients["cbjq_cn"]?.gameSettingsCapabilities, .cbjq)
     }
@@ -31,6 +31,11 @@ final class GameSettingsCapabilitiesTests: XCTestCase {
         XCTAssertTrue(GameSettingsCapabilities.hkrpg.blockNet)
         XCTAssertFalse(GameSettingsCapabilities.hkrpg.steamPatch)
         XCTAssertFalse(GameSettingsCapabilities.hkrpg.resolution)
+
+        XCTAssertTrue(GameSettingsCapabilities.bh3.patchOff)
+        XCTAssertFalse(GameSettingsCapabilities.bh3.steamPatch)
+        XCTAssertFalse(GameSettingsCapabilities.bh3.blockNet)
+        XCTAssertFalse(GameSettingsCapabilities.bh3.resolution)
 
         XCTAssertFalse(GameSettingsCapabilities.none.patchOff)
         XCTAssertFalse(GameSettingsCapabilities.none.blockNet)

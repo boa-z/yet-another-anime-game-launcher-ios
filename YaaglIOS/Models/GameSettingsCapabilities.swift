@@ -39,6 +39,16 @@ struct GameSettingsCapabilities: Equatable, Sendable {
         hdr: false
     )
 
+    static let bh3 = GameSettingsCapabilities(
+        patchOff: true,
+        workaround3: false,
+        steamPatch: false,
+        blockNet: false,
+        timeoutFix: false,
+        resolution: false,
+        hdr: false
+    )
+
     static let cbjq = GameSettingsCapabilities(
         patchOff: false,
         workaround3: false,

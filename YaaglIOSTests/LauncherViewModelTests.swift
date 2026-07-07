@@ -395,6 +395,31 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testImportExistingBH3AboveSupportedVersionIsRejected() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let bh3 = try XCTUnwrap(viewModel.clients.first { $0.id == "bh3_global" })
+        viewModel.selectedClientID = bh3.id
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/BH3",
+            probeResult: .existing(version: bh3.latestVersion)
+        )
+
+        XCTAssertEqual(viewModel.installState, .notInstalled)
+        XCTAssertEqual(viewModel.installDirectory, "")
+        XCTAssertEqual(viewModel.currentVersion, "0.0.0")
+        XCTAssertEqual(viewModel.statusText, "Unsupported game version 8.4.0")
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "import: 8.4.0 is above desktop supported 7.5.0; virtual install record is unchanged"
+        })
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "Import skipped: existing install could not be used"
+        })
+    }
+
+    @MainActor
     func testImportExistingLatestVersionRunsIntegritySimulationThenLaunches() async {
         let viewModel = makeViewModel()
 
@@ -527,6 +552,49 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Launch skipped: unsupported version" })
         XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Launch simulation complete" })
         XCTAssertFalse(viewModel.taskHistory.contains { $0.message.contains("launch command preview") })
+    }
+
+    @MainActor
+    func testBH3UnsupportedLaunchIsBlockedUnlessPatchOffEnabled() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let bh3 = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "iOS Sandbox/VirtualGameData/bh3_global",
+                currentVersion: bh3.latestVersion,
+                predownloadedAll: false,
+                requiresPatchRevert: true
+            ),
+            for: bh3.id
+        )
+        let viewModel = makeViewModel(defaults: defaults)
+        viewModel.selectedClientID = bh3.id
+
+        await viewModel.runPrimaryAction()
+
+        XCTAssertEqual(viewModel.statusText, "Unsupported game version 8.4.0")
+        XCTAssertEqual(viewModel.alertMessage, "Unsupported game version 8.4.0")
+        XCTAssertTrue(store.load(for: bh3.id).requiresPatchRevert)
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "launch: BH3 version 8.4.0 is above desktop supported 7.5.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"
+        })
+        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Launch skipped: unsupported version" })
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Launch simulation complete" })
+
+        viewModel.configuration.patchOff = true
+        await viewModel.runPrimaryAction()
+
+        XCTAssertEqual(viewModel.statusText, "Launch simulation complete")
+        XCTAssertEqual(viewModel.taskStatus, .completed(.launch))
+        let patchOffLaunchState = store.load(for: bh3.id)
+        XCTAssertFalse(
+            patchOffLaunchState.requiresPatchRevert,
+            "Stored state after patchOff launch: \(patchOffLaunchState)"
+        )
+        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Launch Game completed" })
     }
 
     @MainActor

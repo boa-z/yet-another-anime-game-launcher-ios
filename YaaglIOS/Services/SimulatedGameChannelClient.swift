@@ -151,8 +151,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
         state: ChannelClientState,
         configuration: LauncherConfigurationSnapshot
     ) -> Bool {
-        descriptor.gameType == "cbjq"
-            && descriptor.isAboveDesktopSupportedVersion(state.currentVersion)
+        descriptor.isAboveDesktopSupportedVersion(state.currentVersion)
             && !configuration.patchOff
     }
 }

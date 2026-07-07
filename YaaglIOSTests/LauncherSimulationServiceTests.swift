@@ -61,7 +61,15 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let dxmtBlockLog = "dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; " +
             "dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"
         XCTAssertTrue(logs.contains(dxmtBlockLog))
+        XCTAssertTrue(logs.contains {
+            $0.contains("launch: desktop DXMT copy plan") &&
+                $0.contains("./wine/lib/wine/x86_64-windows") &&
+                $0.contains("winemetal.dll to x86_64-windows and system32") &&
+                $0.contains("winemetal.so to x86_64-unix") &&
+                $0.contains("not copied on iOS")
+        })
         XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
+        XCTAssertTrue(logs.contains("launch: desktop protonextras copy plan maps steam64.exe -> system32/steam.exe, steam32.exe -> syswow64/steam.exe, lsteamclient64.dll -> system32/lsteamclient.dll, lsteamclient32.dll -> syswow64/lsteamclient.dll (not copied on iOS)"))
         XCTAssertTrue(logs.contains("launch: MTL_HUD_ENABLED=1"))
         XCTAssertTrue(logs.contains("launch env preview: MTL_HUD_ENABLED=1"))
         XCTAssertTrue(logs.contains("launch: Wine Mac Driver RetinaMode=y is simulated"))
@@ -296,9 +304,29 @@ final class LauncherSimulationServiceTests: XCTestCase {
     }
 
     @MainActor
-    func testLaunchProgramIgnoresUnsupportedGameSettingsForBH3() async throws {
+    func testBH3LaunchGuardAndPatchOffTraceMatchDesktop() async throws {
         let service = LauncherSimulationService(stepDurationMilliseconds: 0)
         let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+        let blockedCommands = try await collect(
+            service.makeProgram(
+                action: .launch,
+                client: client,
+                configuration: launchSnapshot(
+                    patchOff: false,
+                    wineDistro: "11.0-dxmt-signed-with-patches"
+                ),
+                installDirectory: "iOS Sandbox/VirtualGameData/bh3_global",
+                state: installedState(for: client, at: "iOS Sandbox/VirtualGameData/bh3_global")
+            )
+        )
+        let blockedStateTexts = blockedCommands.compactMap(\.stateText)
+        let blockedLogs = blockedCommands.compactMap(\.log)
+
+        XCTAssertTrue(blockedStateTexts.contains("Unsupported game version 8.4.0"))
+        XCTAssertTrue(blockedLogs.contains("launch: BH3 version 8.4.0 is above desktop supported 7.5.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"))
+        XCTAssertFalse(blockedLogs.contains { $0.contains("dependency: Jadeite") })
+        XCTAssertFalse(blockedLogs.contains { $0.contains("launch command preview") })
+
         let commands = try await collect(
             service.makeProgram(
                 action: .launch,
@@ -335,18 +363,26 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let stateTexts = commands.compactMap(\.stateText)
         let logs = commands.compactMap(\.log)
 
-        XCTAssertTrue(logs.contains("launch: full patch payload set is simulated"))
+        XCTAssertTrue(logs.contains("launch: game AC patch is disabled"))
+        XCTAssertTrue(logs.contains("launch: patchOff requested no game file patch"))
         XCTAssertTrue(logs.contains("dependency: Jadeite 4.1.0 metadata mirrors installed_jadeite_version; v4.1.0.zip were not downloaded"))
         XCTAssertTrue(logs.contains("dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"))
+        XCTAssertTrue(logs.contains {
+            $0.contains("launch: desktop DXMT copy plan") &&
+                $0.contains("./wine/lib/wine/x86_64-windows") &&
+                $0.contains("winemetal.dll to x86_64-windows and system32") &&
+                $0.contains("not copied on iOS")
+        })
         XCTAssertTrue(logs.contains("launch: jadeite.exe wraps BH3.exe"))
-        XCTAssertTrue(logs.contains("launch: desktop removed-file patch plan moves BH3_Data/Plugins/crashreport.exe, BH3_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
+        XCTAssertTrue(logs.contains("launch: desktop protonextras copy plan maps steam64.exe -> system32/steam.exe, steam32.exe -> syswow64/steam.exe, lsteamclient64.dll -> system32/lsteamclient.dll, lsteamclient32.dll -> syswow64/lsteamclient.dll (not copied on iOS)"))
         XCTAssertTrue(logs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
         XCTAssertTrue(logs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
-        XCTAssertTrue(logs.contains("launch: WINEESYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
-        XCTAssertFalse(logs.contains("launch: game AC patch is disabled"))
+        XCTAssertTrue(logs.contains("launch: WINEMSYNC=1; DXMT_LOG_PATH=./; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
+        XCTAssertFalse(logs.contains("launch: desktop removed-file patch plan moves BH3_Data/Plugins/crashreport.exe, BH3_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
+        XCTAssertFalse(logs.contains("launch: full patch payload set is simulated"))
         XCTAssertFalse(logs.contains("launch: workaround3 skips tagged patch payloads"))
         XCTAssertFalse(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
-        XCTAssertFalse(logs.contains { $0.contains("steam.exe") })
+        XCTAssertFalse(logs.contains("launch: would execute C:\\windows\\system32\\steam.exe with BH3.exe"))
         XCTAssertFalse(logs.contains { $0.contains("hosts edit disabled on iOS") })
         XCTAssertFalse(stateTexts.contains("Simulating HDR registry write"))
         XCTAssertFalse(stateTexts.contains("Applying 2560x1440"))
@@ -377,6 +413,13 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let batchLogs = batchCommands.compactMap(\.log)
 
         XCTAssertTrue(batchLogs.contains("launch: NAP WebView cleanup HKEY_CURRENT_USER\\Software\\miHoYo\\ZenlessZoneZero removes MIHOYOSDK_WEBVIEW_RENDER_METHOD_h1573598267 and HOYO_WEBVIEW_RENDER_METHOD_ABTEST_*"))
+        XCTAssertTrue(batchLogs.contains("launch: desktop removed-file patch plan moves ZenlessZoneZero_Data/Plugins/x86_64/vulkan-1.dll to .bak and restores them after exit"))
+        XCTAssertTrue(batchLogs.contains("launch: desktop protonextras copy plan maps steam64.exe -> system32/steam.exe, steam32.exe -> syswow64/steam.exe, lsteamclient64.dll -> system32/lsteamclient.dll, lsteamclient32.dll -> syswow64/lsteamclient.dll (not copied on iOS)"))
+        XCTAssertTrue(batchLogs.contains {
+            $0.contains("launch: desktop DXMT copy plan") &&
+                $0.contains("./wine/lib/wine/x86_64-windows") &&
+                $0.contains("winemetal.so to x86_64-unix")
+        })
         XCTAssertTrue(batchLogs.contains("launch: NAP args -screen-width 1280 -screen-height 720 -screen-fullscreen 0"))
         XCTAssertTrue(batchLogs.contains("launch: WINEMSYNC=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(batchLogs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 globaldp-prod-os01.zenlesszonezero.com for 20s"))
@@ -430,16 +473,23 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let logs = commands.compactMap(\.log)
 
         XCTAssertTrue(logs.contains("launch: HKRPG WebView cleanup HKEY_CURRENT_USER\\Software\\Cognosphere\\Star Rail removes MIHOYOSDK_WEBVIEW_RENDER_METHOD_h1573598267 and HOYO_WEBVIEW_RENDER_METHOD_ABTEST_*"))
+        XCTAssertTrue(logs.contains("launch: desktop removed-file patch plan moves StarRail_Data/Plugins/x86_64/crashreport.exe, StarRail_Data/Plugins/x86_64/vulkan-1.dll to .bak and restores them after exit"))
         XCTAssertTrue(logs.contains("dependency: Jadeite 4.1.0 metadata mirrors installed_jadeite_version; v4.1.0.zip were not downloaded"))
         XCTAssertTrue(logs.contains("launch: jadeite.exe wraps StarRail.exe -- -disable-gpu-skinning"))
         XCTAssertTrue(logs.contains("launch: HKRPG NVIDIA extension registry writes are simulated"))
         XCTAssertTrue(logs.contains("dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"))
+        XCTAssertTrue(logs.contains {
+            $0.contains("launch: desktop DXMT copy plan") &&
+                $0.contains("nvngx.dll to x86_64-windows and system32") &&
+                $0.contains("not copied on iOS")
+        })
         XCTAssertTrue(logs.contains("launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60;dxgi.customVendorId=10de;dxgi.customDeviceId=2684; DXMT_ENABLE_NVEXT=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(logs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 globaldp-prod-os01.starrails.com for 15s"))
         XCTAssertTrue(logs.contains("launch: HTTP_PROXY=127.0.0.1:8080; HTTPS_PROXY=127.0.0.1:8080"))
         XCTAssertTrue(logs.contains("launch env preview: HTTP_PROXY=127.0.0.1:8080 HTTPS_PROXY=127.0.0.1:8080"))
         XCTAssertTrue(logs.contains("launch: would execute cmd /c config.bat for StarRail.exe"))
         XCTAssertTrue(logs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for StarRail.exe (not executed)"))
+        XCTAssertFalse(logs.contains { $0.contains("protonextras") })
         XCTAssertFalse(logs.contains { $0.contains("steam.exe") })
         XCTAssertFalse(logs.contains { $0.contains("resolution registry") })
         XCTAssertFalse(logs.contains { $0.contains("HDR registry") })
@@ -532,6 +582,12 @@ final class LauncherSimulationServiceTests: XCTestCase {
         })
         XCTAssertTrue(launchLogs.contains("launch: CBJQ config.bat runs Game/Binaries/Win64/Game.exe -FeatureLevelES31 -ChannelID=seasun"))
         XCTAssertTrue(launchLogs.contains("dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"))
+        XCTAssertTrue(launchLogs.contains {
+            $0.contains("launch: desktop CBJQ DXMT copy plan") &&
+                $0.contains("Wine prefix system32 only") &&
+                $0.contains("protonextras are not used") &&
+                $0.contains("not copied on iOS")
+        })
         XCTAssertTrue(launchLogs.contains("launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(launchLogs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
         XCTAssertTrue(launchLogs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
