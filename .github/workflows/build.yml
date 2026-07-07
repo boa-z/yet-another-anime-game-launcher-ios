@@ -271,6 +271,21 @@ jobs:
           git tag -f nightly "${{ needs.build.outputs.commit_sha }}"
           git push --force origin refs/tags/nightly
 
+      - name: Remove previous nightly assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if ! gh release view nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          gh release view nightly --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+            while IFS= read -r asset_name; do
+              [ -n "$asset_name" ] || continue
+              gh release delete-asset nightly "$asset_name" --repo "$GITHUB_REPOSITORY" --yes
+            done
+
       - name: Publish nightly release
         uses: softprops/action-gh-release@v3
         with:
