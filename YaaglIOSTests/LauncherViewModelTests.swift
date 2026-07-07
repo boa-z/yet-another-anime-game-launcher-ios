@@ -552,6 +552,19 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Launch skipped: unsupported version" })
         XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Launch simulation complete" })
         XCTAssertFalse(viewModel.taskHistory.contains { $0.message.contains("launch command preview") })
+
+        viewModel.configuration.patchOff = true
+        await viewModel.runPrimaryAction()
+
+        XCTAssertEqual(viewModel.statusText, "Unsupported game version 2.1.0")
+        XCTAssertEqual(viewModel.alertMessage, "Unsupported game version 2.1.0")
+        XCTAssertTrue(store.load(for: cbjq.id).requiresPatchRevert)
+        XCTAssertEqual(
+            viewModel.taskHistory.filter { $0.message == "Launch skipped: unsupported version" }.count,
+            2
+        )
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Launch simulation complete" })
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message.contains("launch command preview") })
     }
 
     @MainActor

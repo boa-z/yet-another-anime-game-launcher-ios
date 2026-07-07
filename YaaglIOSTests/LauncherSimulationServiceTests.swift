@@ -568,7 +568,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertFalse(blockedLaunchLogs.contains { $0.contains("dependency: Jadeite") })
         XCTAssertFalse(blockedLaunchLogs.contains { $0.contains("launch command preview") })
 
-        let launchLogs = try await logs(
+        let stalePatchOffLaunchCommands = try await collect(
             service.makeProgram(
                 action: .launch,
                 client: cbjq,
@@ -579,6 +579,28 @@ final class LauncherSimulationServiceTests: XCTestCase {
                 ),
                 installDirectory: directory,
                 state: installedState(for: cbjq, at: directory)
+            )
+        )
+        let stalePatchOffStateTexts = stalePatchOffLaunchCommands.compactMap(\.stateText)
+        let stalePatchOffLogs = stalePatchOffLaunchCommands.compactMap(\.log)
+
+        XCTAssertTrue(stalePatchOffStateTexts.contains("Unsupported game version 2.1.0"))
+        XCTAssertTrue(stalePatchOffLogs.contains("launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"))
+        XCTAssertFalse(stalePatchOffStateTexts.contains("Game is running (simulation)"))
+        XCTAssertFalse(stalePatchOffLogs.contains { $0.contains("dependency: Jadeite") })
+        XCTAssertFalse(stalePatchOffLogs.contains { $0.contains("launch command preview") })
+
+        let launchLogs = try await logs(
+            service.makeProgram(
+                action: .launch,
+                client: cbjq,
+                configuration: launchSnapshot(
+                    reshade: true,
+                    patchOff: true,
+                    wineDistro: "11.0-dxmt-signed-with-patches"
+                ),
+                installDirectory: directory,
+                state: installedState(for: cbjq, at: directory, currentVersion: "2.0.0")
             )
         )
         XCTAssertFalse(launchLogs.contains { $0.contains("unsupported-version alert") })

@@ -151,7 +151,8 @@ struct SimulatedGameChannelClient: GameChannelClient {
         state: ChannelClientState,
         configuration: LauncherConfigurationSnapshot
     ) -> Bool {
-        descriptor.isAboveDesktopSupportedVersion(state.currentVersion)
-            && !configuration.patchOff
+        let patchOffBypassesGuard = descriptor.gameSettingsCapabilities.patchOff && configuration.patchOff
+        return descriptor.isAboveDesktopSupportedVersion(state.currentVersion)
+            && !patchOffBypassesGuard
     }
 }

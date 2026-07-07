@@ -1112,8 +1112,9 @@ struct LauncherSimulationService: Sendable {
         version: String,
         configuration: LauncherConfigurationSnapshot
     ) -> String? {
+        let patchOffBypassesGuard = client.gameSettingsCapabilities.patchOff && configuration.patchOff
         guard client.isAboveDesktopSupportedVersion(version),
-              !configuration.patchOff
+              !patchOffBypassesGuard
         else {
             return nil
         }
