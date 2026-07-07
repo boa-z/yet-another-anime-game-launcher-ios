@@ -225,7 +225,8 @@ jobs:
     permissions:
       contents: write
     if: >-
-      github.event_name == 'workflow_dispatch' && inputs.release_nightly
+      (github.event_name == 'workflow_dispatch' && inputs.release_nightly) ||
+      (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     concurrency:
       group: release-nightly
       cancel-in-progress: true
@@ -240,6 +241,20 @@ jobs:
         with:
           name: ${{ needs.build.outputs.archive_artifact }}
 
+      - name: Resolve release metadata
+        id: release_metadata
+        env:
+          EVENT_HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -eu
+          commit_message="${EVENT_HEAD_COMMIT_MESSAGE:-Manual workflow dispatch}"
+          delimiter="$(uuidgen)"
+          {
+            echo "commit_message<<$delimiter"
+            echo "$commit_message"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish nightly release
         uses: softprops/action-gh-release@v3
         with:
@@ -250,6 +265,7 @@ jobs:
           overwrite_files: true
           body: |
             **Commit:** ${{ github.sha }}
+            **Message:** ${{ steps.release_metadata.outputs.commit_message }}
             **Build:** ${{ env.marketing_version }} (${{ needs.build.outputs.build_number }})
             **Short SHA:** ${{ needs.build.outputs.short_sha }}
 
