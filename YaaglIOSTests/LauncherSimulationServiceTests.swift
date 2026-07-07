@@ -86,8 +86,11 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let reshadeBlockLog = "dependency: ReShade 5.8.0 metadata mirrors installed_reshade; " +
             "ReShade_Setup_5.8.0_Addon.exe, install.exe, install.zip, d3dcompiler_47.dll, ReShade64.dll, dxgi.dll, ReShade.ini were not downloaded, extracted, copied, or written"
         XCTAssertTrue(logs.contains(reshadeBlockLog))
+        XCTAssertTrue(logs.contains("launch: desktop ReShade copy plan maps ./reshade/dxgi.dll -> game dir dxgi.dll and ./reshade/d3dcompiler_47.dll -> game dir d3dcompiler_47.dll (not copied on iOS)"))
         XCTAssertTrue(logs.contains("launch: HK4E HDR registry revert WINDOWS_HDR_ON_h3132281285=- is simulated"))
         XCTAssertTrue(logs.contains("launch: HK4E resolution registry revert Screenmanager Is Fullscreen mode_h3981298716, Screenmanager Resolution Width_h182942802, Screenmanager Resolution Height_h2627697771 is simulated"))
+        XCTAssertTrue(logs.contains("launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal, nvngx, and protonextras copies are not reverted by desktop patchRevertProgram (not restored on iOS)"))
+        XCTAssertTrue(logs.contains("launch: desktop ReShade revert plan removes game dir dxgi.dll and d3dcompiler_47.dll (not removed on iOS)"))
         XCTAssertEqual(patchStates, [true, false])
     }
 
@@ -375,9 +378,12 @@ final class LauncherSimulationServiceTests: XCTestCase {
         })
         XCTAssertTrue(logs.contains("launch: jadeite.exe wraps BH3.exe"))
         XCTAssertTrue(logs.contains("launch: desktop protonextras copy plan maps steam64.exe -> system32/steam.exe, steam32.exe -> syswow64/steam.exe, lsteamclient64.dll -> system32/lsteamclient.dll, lsteamclient32.dll -> syswow64/lsteamclient.dll (not copied on iOS)"))
+        XCTAssertTrue(logs.contains("launch: desktop ReShade copy plan maps ./reshade/dxgi.dll -> game dir dxgi.dll and ./reshade/d3dcompiler_47.dll -> game dir d3dcompiler_47.dll (not copied on iOS)"))
         XCTAssertTrue(logs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
         XCTAssertTrue(logs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
         XCTAssertTrue(logs.contains("launch: WINEMSYNC=1; DXMT_LOG_PATH=./; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
+        XCTAssertTrue(logs.contains("launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal, nvngx, and protonextras copies are not reverted by desktop patchRevertProgram (not restored on iOS)"))
+        XCTAssertTrue(logs.contains("launch: desktop ReShade revert plan removes game dir dxgi.dll and d3dcompiler_47.dll (not removed on iOS)"))
         XCTAssertFalse(logs.contains("launch: desktop removed-file patch plan moves BH3_Data/Plugins/crashreport.exe, BH3_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
         XCTAssertFalse(logs.contains("launch: full patch payload set is simulated"))
         XCTAssertFalse(logs.contains("launch: workaround3 skips tagged patch payloads"))
@@ -426,6 +432,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(batchLogs.contains("launch: would execute cmd /c config.bat for ZenlessZoneZero.exe"))
         XCTAssertTrue(batchLogs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for ZenlessZoneZero.exe (not executed)"))
         XCTAssertTrue(batchLogs.contains("launch: NAP Screenmanager registry cleanup is simulated"))
+        XCTAssertTrue(batchLogs.contains("launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal, nvngx, and protonextras copies are not reverted by desktop patchRevertProgram (not restored on iOS)"))
         XCTAssertFalse(batchLogs.contains { $0.contains("Steam path bypasses resolution args") })
 
         let steamCommands = try await collect(
@@ -489,6 +496,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch env preview: HTTP_PROXY=127.0.0.1:8080 HTTPS_PROXY=127.0.0.1:8080"))
         XCTAssertTrue(logs.contains("launch: would execute cmd /c config.bat for StarRail.exe"))
         XCTAssertTrue(logs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for StarRail.exe (not executed)"))
+        XCTAssertTrue(logs.contains("launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal and nvngx copies are not reverted by desktop patchRevertProgram (not restored on iOS)"))
         XCTAssertFalse(logs.contains { $0.contains("protonextras") })
         XCTAssertFalse(logs.contains { $0.contains("steam.exe") })
         XCTAssertFalse(logs.contains { $0.contains("resolution registry") })
@@ -588,11 +596,14 @@ final class LauncherSimulationServiceTests: XCTestCase {
                 $0.contains("protonextras are not used") &&
                 $0.contains("not copied on iOS")
         })
+        XCTAssertTrue(launchLogs.contains("launch: desktop ReShade copy plan maps ./reshade/dxgi.dll -> game dir dxgi.dll and ./reshade/d3dcompiler_47.dll -> game dir d3dcompiler_47.dll (not copied on iOS)"))
         XCTAssertTrue(launchLogs.contains("launch: WINEMSYNC=1; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(launchLogs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
         XCTAssertTrue(launchLogs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
         XCTAssertTrue(launchLogs.contains("launch: would execute cmd /c config.bat for Game/Binaries/Win64/Game.exe"))
         XCTAssertTrue(launchLogs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for Game/Binaries/Win64/Game.exe (not executed)"))
+        XCTAssertTrue(launchLogs.contains("launch: desktop CBJQ DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in Wine prefix system32 only (not restored on iOS)"))
+        XCTAssertTrue(launchLogs.contains("launch: desktop ReShade revert plan removes game dir dxgi.dll and d3dcompiler_47.dll (not removed on iOS)"))
 
         let cnLaunchLogs = try await logs(
             service.makeProgram(

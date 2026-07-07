@@ -486,6 +486,11 @@ struct LauncherSimulationService: Sendable {
                 progress: 0.44,
                 log: reshade?.downloadBlockLog ?? "launch: ReShade download is disabled"
             ))
+            steps.append(SimulationStep(
+                "Simulating ReShade copy targets",
+                progress: 0.44,
+                log: reshadeCopyTargetPlanLog()
+            ))
         }
 
         if configuration.proxyEnabled {
@@ -803,6 +808,23 @@ struct LauncherSimulationService: Sendable {
             }
         }
 
+        if WineDistribution.distribution(id: configuration.wineDistro)?.renderBackend == "dxmt",
+           let dxmtRevertLog = dxmtRevertTargetPlanLog(for: client) {
+            steps.append(SimulationStep(
+                "Reverting DXMT copy targets",
+                progress: 0.88,
+                log: dxmtRevertLog
+            ))
+        }
+
+        if configuration.reshade {
+            steps.append(SimulationStep(
+                "Reverting ReShade copy targets",
+                progress: 0.88,
+                log: reshadeRevertPlanLog()
+            ))
+        }
+
         return steps
     }
 
@@ -891,6 +913,27 @@ struct LauncherSimulationService: Sendable {
         default:
             nil
         }
+    }
+
+    private func dxmtRevertTargetPlanLog(for client: GameClientDescriptor) -> String? {
+        switch client.gameType {
+        case "hk4e", "nap", "bh3":
+            "launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal, nvngx, and protonextras copies are not reverted by desktop patchRevertProgram (not restored on iOS)"
+        case "hkrpg":
+            "launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal and nvngx copies are not reverted by desktop patchRevertProgram (not restored on iOS)"
+        case "cbjq":
+            "launch: desktop CBJQ DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in Wine prefix system32 only (not restored on iOS)"
+        default:
+            nil
+        }
+    }
+
+    private func reshadeCopyTargetPlanLog() -> String {
+        "launch: desktop ReShade copy plan maps ./reshade/dxgi.dll -> game dir dxgi.dll and ./reshade/d3dcompiler_47.dll -> game dir d3dcompiler_47.dll (not copied on iOS)"
+    }
+
+    private func reshadeRevertPlanLog() -> String {
+        "launch: desktop ReShade revert plan removes game dir dxgi.dll and d3dcompiler_47.dll (not removed on iOS)"
     }
 
     private func updateSteps(client: GameClientDescriptor, state: ChannelClientState) -> [SimulationStep] {
