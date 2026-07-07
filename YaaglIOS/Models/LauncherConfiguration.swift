@@ -4,7 +4,8 @@ import Observation
 @MainActor
 @Observable
 final class LauncherConfiguration {
-    static let advancedSettingsUnlockEnabled = true
+    static let defaultAdvancedSettingsUnlockEnabled = LauncherBuildSettings.advancedSettingsUnlockEnabled
+    let advancedSettingsUnlockEnabled: Bool
 
     var metalHud: Bool {
         didSet { saveDesktopBoolString(metalHud, forKey: Keys.metalHud) }
@@ -143,8 +144,13 @@ final class LauncherConfiguration {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var hasStoredWineDistro: Bool
 
-    init(defaults: UserDefaults = .standard, defaultWineDistro: String = WineDistribution.defaultID) {
+    init(
+        defaults: UserDefaults = .standard,
+        defaultWineDistro: String = WineDistribution.defaultID,
+        advancedSettingsUnlockEnabled: Bool = LauncherConfiguration.defaultAdvancedSettingsUnlockEnabled
+    ) {
         self.defaults = defaults
+        self.advancedSettingsUnlockEnabled = advancedSettingsUnlockEnabled
         let storedWineDistro = defaults.string(forKey: Keys.wineDistro)
         hasStoredWineDistro = storedWineDistro?.isEmpty == false
         metalHud = Self.loadDesktopBool(defaults, forKey: Keys.metalHud)
@@ -154,7 +160,7 @@ final class LauncherConfiguration {
         proxyHost = defaults.string(forKey: Keys.proxyHost) ?? "127.0.0.1:8080"
         fpsUnlock = FPSUnlockOption.option(forStoredValue: defaults.string(forKey: Keys.fpsUnlock)) ?? .disabled
         uiLocale = UILocaleOption.option(forStoredValue: defaults.string(forKey: Keys.uiLocale)) ?? .defaultOption
-        advancedSettingsVisible = Self.advancedSettingsUnlockEnabled && Self.loadDesktopBool(defaults, forKey: Keys.advancedSettingsVisible)
+        advancedSettingsVisible = advancedSettingsUnlockEnabled && Self.loadDesktopBool(defaults, forKey: Keys.advancedSettingsVisible)
         reshade = Self.loadDesktopBool(defaults, forKey: Keys.reshade)
         patchOff = Self.loadDesktopBool(defaults, forKey: Keys.patchOff)
         workaround3 = Self.loadDesktopBool(defaults, forKey: Keys.workaround3, defaultValue: true)

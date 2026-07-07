@@ -82,7 +82,7 @@ struct GeneralSettingsView: View {
     }
 
     private func registerVersionTap() {
-        guard LauncherConfiguration.advancedSettingsUnlockEnabled else {
+        guard configuration.advancedSettingsUnlockEnabled else {
             return
         }
 

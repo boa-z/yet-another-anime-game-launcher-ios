@@ -83,7 +83,7 @@ final class LauncherConfigurationTests: XCTestCase {
     @MainActor
     func testAdvancedSettingsVisibilityPersistsDesktopKey() {
         let defaults = makeDefaults()
-        let configuration = LauncherConfiguration(defaults: defaults)
+        let configuration = LauncherConfiguration(defaults: defaults, advancedSettingsUnlockEnabled: true)
 
         XCTAssertFalse(configuration.advancedSettingsVisible)
         XCTAssertNil(defaults.string(forKey: "config_advanced"))
@@ -91,7 +91,7 @@ final class LauncherConfigurationTests: XCTestCase {
         configuration.advancedSettingsVisible = true
 
         XCTAssertEqual(defaults.string(forKey: "config_advanced"), "true")
-        XCTAssertTrue(LauncherConfiguration(defaults: defaults).advancedSettingsVisible)
+        XCTAssertTrue(LauncherConfiguration(defaults: defaults, advancedSettingsUnlockEnabled: true).advancedSettingsVisible)
 
         configuration.advancedSettingsVisible = false
 
@@ -104,9 +104,20 @@ final class LauncherConfigurationTests: XCTestCase {
         let defaults = makeDefaults()
         defaults.set(true, forKey: "config_advanced")
 
-        let configuration = LauncherConfiguration(defaults: defaults)
+        let configuration = LauncherConfiguration(defaults: defaults, advancedSettingsUnlockEnabled: true)
 
         XCTAssertTrue(configuration.advancedSettingsVisible)
+    }
+
+    @MainActor
+    func testAdvancedSettingsVisibilityObeysDisabledBuildGate() {
+        let defaults = makeDefaults()
+        defaults.set("true", forKey: "config_advanced")
+
+        let configuration = LauncherConfiguration(defaults: defaults, advancedSettingsUnlockEnabled: false)
+
+        XCTAssertFalse(configuration.advancedSettingsUnlockEnabled)
+        XCTAssertFalse(configuration.advancedSettingsVisible)
     }
 
     @MainActor
