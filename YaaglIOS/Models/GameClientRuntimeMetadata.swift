@@ -8,6 +8,7 @@ struct GameClientRuntimeMetadata: Equatable, Sendable {
     let predownloadAvailable: Bool?
     let installSize: String?
     let predownloadArchiveBasenames: [String]?
+    let seasunManifestMetadata: VirtualInstallManifestMetadata?
 
     init(
         latestVersion: String? = nil,
@@ -17,7 +18,8 @@ struct GameClientRuntimeMetadata: Equatable, Sendable {
         predownloadAvailable: Bool? = nil,
         installSize: String? = nil,
         installSizeBytes: Int64? = nil,
-        predownloadArchiveBasenames: [String]? = nil
+        predownloadArchiveBasenames: [String]? = nil,
+        seasunManifestMetadata: VirtualInstallManifestMetadata? = nil
     ) {
         self.latestVersion = latestVersion
         self.currentSupportedVersion = currentSupportedVersion
@@ -26,6 +28,7 @@ struct GameClientRuntimeMetadata: Equatable, Sendable {
         self.predownloadAvailable = predownloadAvailable
         self.installSize = installSize ?? installSizeBytes.map(Self.installSizeString(bytes:))
         self.predownloadArchiveBasenames = predownloadArchiveBasenames
+        self.seasunManifestMetadata = seasunManifestMetadata
     }
 
     private static func installSizeString(bytes: Int64) -> String {
@@ -149,7 +152,42 @@ enum GameClientRuntimeMetadataParser {
         return GameClientRuntimeMetadata(
             latestVersion: try string("projectVersion", in: root),
             predownloadAvailable: false,
-            installSizeBytes: installSizeBytes(from: paks, sizeKey: "sizeInBytes")
+            installSizeBytes: installSizeBytes(from: paks, sizeKey: "sizeInBytes"),
+            seasunManifestMetadata: try seasunManifestMetadata(from: root)
+        )
+    }
+
+    private static func seasunManifestMetadata(from root: [String: Any]) throws -> VirtualInstallManifestMetadata {
+        let rawPaks = array("paks", in: root) ?? []
+        let paks = rawPaks.compactMap(seasunPakMetadata)
+        return VirtualInstallManifestMetadata(
+            manifestVersion: try string("version", in: root),
+            projectVersion: try string("projectVersion", in: root),
+            pathOffset: try string("pathOffset", in: root),
+            paks: paks,
+            sourceServerID: "",
+            channel: nil,
+            expectedPakCount: rawPaks.count,
+            expectedPayloadBytes: paks.reduce(0) { $0 + $1.sizeInBytes }
+        )
+    }
+
+    private static func seasunPakMetadata(from dictionary: [String: Any]) -> VirtualInstallManifestMetadata.Pak? {
+        guard let name = optionalString("name", in: dictionary),
+              let hash = optionalString("hash", in: dictionary),
+              let sizeInBytes = optionalInt64("sizeInBytes", in: dictionary)
+        else {
+            return nil
+        }
+
+        return VirtualInstallManifestMetadata.Pak(
+            name: name,
+            hash: hash,
+            sizeInBytes: sizeInBytes,
+            bPrimary: bool("bPrimary", in: dictionary) ?? false,
+            base: optionalString("base", in: dictionary) ?? "",
+            diff: optionalString("diff", in: dictionary) ?? "",
+            diffSizeBytes: optionalString("diffSizeBytes", in: dictionary) ?? ""
         )
     }
 

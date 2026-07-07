@@ -18,6 +18,7 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
     let predownloadVersion: String?
     let predownloadAvailable: Bool
     let predownloadArchiveBasenames: [String]
+    let seasunManifestMetadata: VirtualInstallManifestMetadata?
     let installSize: String
     let accentHex: String
     let secondaryHex: String
@@ -41,6 +42,7 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
         predownloadVersion: String?,
         predownloadAvailable: Bool,
         predownloadArchiveBasenames: [String] = [],
+        seasunManifestMetadata: VirtualInstallManifestMetadata? = nil,
         installSize: String,
         accentHex: String,
         secondaryHex: String,
@@ -63,6 +65,7 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
         self.predownloadVersion = predownloadVersion
         self.predownloadAvailable = predownloadAvailable
         self.predownloadArchiveBasenames = predownloadArchiveBasenames
+        self.seasunManifestMetadata = seasunManifestMetadata
         self.installSize = installSize
         self.accentHex = accentHex
         self.secondaryHex = secondaryHex
@@ -112,6 +115,7 @@ extension GameClientDescriptor {
             predownloadVersion: updatedPredownloadVersion,
             predownloadAvailable: updatedPredownloadAvailable,
             predownloadArchiveBasenames: metadata.predownloadArchiveBasenames ?? predownloadArchiveBasenames,
+            seasunManifestMetadata: metadata.seasunManifestMetadata?.applying(client: self) ?? seasunManifestMetadata,
             installSize: metadata.installSize ?? installSize,
             accentHex: accentHex,
             secondaryHex: secondaryHex,

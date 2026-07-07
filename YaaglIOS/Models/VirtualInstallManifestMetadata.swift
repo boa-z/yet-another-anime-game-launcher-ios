@@ -1,7 +1,7 @@
 import Foundation
 
-struct VirtualInstallManifestMetadata: Codable, Equatable, Sendable {
-    struct Pak: Codable, Equatable, Sendable {
+struct VirtualInstallManifestMetadata: Codable, Hashable, Sendable {
+    struct Pak: Codable, Hashable, Sendable {
         var name: String
         var hash: String
         var sizeInBytes: Int64
@@ -84,6 +84,19 @@ struct VirtualInstallManifestMetadata: Codable, Equatable, Sendable {
             channel: client.server.desktopServerChannel,
             expectedPakCount: pakCount,
             expectedPayloadBytes: Int64(payloadBytes)
+        )
+    }
+
+    func applying(client: GameClientDescriptor) -> VirtualInstallManifestMetadata {
+        VirtualInstallManifestMetadata(
+            manifestVersion: manifestVersion,
+            projectVersion: projectVersion,
+            pathOffset: pathOffset,
+            paks: paks,
+            sourceServerID: client.serverID,
+            channel: client.server.desktopServerChannel,
+            expectedPakCount: expectedPakCount,
+            expectedPayloadBytes: expectedPayloadBytes
         )
     }
 

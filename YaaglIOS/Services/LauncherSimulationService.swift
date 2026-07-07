@@ -66,7 +66,7 @@ struct LauncherSimulationService: Sendable {
         case .predownload:
             predownloadSteps(client: client)
         case .checkIntegrity:
-            checkIntegritySteps(client: client)
+            checkIntegritySteps(client: client, installDirectory: installDirectory, state: state)
         case .initEnvironment:
             initEnvironmentSteps(client: client, requiresPatchRevert: state.requiresPatchRevert, configuration: configuration)
         case .checkLauncherUpdate:
@@ -100,9 +100,19 @@ struct LauncherSimulationService: Sendable {
         ]
     }
 
-    private func checkIntegritySteps(client: GameClientDescriptor) -> [SimulationStep] {
-        [
+    private func checkIntegritySteps(
+        client: GameClientDescriptor,
+        installDirectory: String,
+        state: ChannelClientState
+    ) -> [SimulationStep] {
+        let planningSteps = seasunIntegrityPlanningSteps(
+            client: client,
+            installDirectory: installDirectory,
+            state: state
+        )
+        return [
             SimulationStep("Checking game file integrity. Completed files 0/6", progress: 0.0, log: integrityPipelineLog(for: client)),
+        ] + planningSteps + [
             SimulationStep("Checking game file integrity. Completed files 2/6", progress: 0.33),
             SimulationStep("Checking game file integrity. Completed files 4/6", progress: 0.66),
             SimulationStep("Blocked desktop sidecar execution", progress: 0.72, log: sidecarBlockLog(for: client, action: .checkIntegrity)),
@@ -977,7 +987,7 @@ struct LauncherSimulationService: Sendable {
             ]
         }
 
-        return [
+        var steps = [
             SimulationStep("Updating", progress: nil, log: "update: \(state.currentVersion) -> \(client.latestVersion)"),
             SimulationStep("Preparing desktop update pipeline", progress: 0.12, log: updatePipelineLog(for: client)),
             SimulationStep("Blocked desktop sidecar execution", progress: 0.18, log: sidecarBlockLog(for: client, action: .update)),
@@ -992,6 +1002,11 @@ struct LauncherSimulationService: Sendable {
             ),
             SimulationStep("Update simulation complete", progress: 1.0)
         ]
+        steps.insert(
+            contentsOf: seasunUpdatePlanningSteps(client: client, state: state),
+            at: 4
+        )
+        return steps
     }
 
     private func updatePredownloadMarkerClearLog(for state: ChannelClientState) -> String {
@@ -1041,6 +1056,117 @@ struct LauncherSimulationService: Sendable {
         default:
             "update: unzip output, deletefiles.txt cleanup, and hdifffiles.txt patch map are simulated"
         }
+    }
+
+    private func seasunUpdatePlanningSteps(
+        client: GameClientDescriptor,
+        state: ChannelClientState
+    ) -> [SimulationStep] {
+        guard client.gameType == "cbjq" else {
+            return []
+        }
+        guard let localManifest = state.virtualManifestMetadata else {
+            return [
+                SimulationStep(
+                    "Planning Seasun manifest diff",
+                    progress: 0.34,
+                    log: "update: local manifest.json metadata is unavailable; desktop would treat the local pak list as empty"
+                )
+            ]
+        }
+        guard let remoteManifest = remoteSeasunManifest(for: client) else {
+            return [
+                SimulationStep(
+                    "Planning Seasun manifest diff",
+                    progress: 0.34,
+                    log: "update: remote Seasun manifest metadata is unavailable; no pak hash diff can be represented"
+                )
+            ]
+        }
+        guard !remoteManifest.paks.isEmpty else {
+            return [
+                SimulationStep(
+                    "Planning Seasun manifest diff",
+                    progress: 0.34,
+                    log: "update: Seasun manifest summary local_paks=\(localManifest.pakCount) remote_paks=\(remoteManifest.pakCount) is represented; remote full pak hash list is unavailable"
+                )
+            ]
+        }
+
+        let plan = SeasunManifestUpdatePlan.make(
+            local: localManifest,
+            remote: remoteManifest,
+            gameDirectory: state.installDirectory,
+            dlcBaseURL: client.server.dlcBaseURL ?? ""
+        )
+        return [
+            SimulationStep(
+                "Planning Seasun manifest diff",
+                progress: 0.34,
+                log: seasunUpdatePlanLog(plan)
+            )
+        ]
+    }
+
+    private func seasunUpdatePlanLog(_ plan: SeasunManifestUpdatePlan) -> String {
+        let firstRemoval = plan.removedPaks.first.map { " first_remove=\($0.localName)" } ?? ""
+        let firstAddition = plan.addedPaks.first.map {
+            " first_add=\($0.remoteName) hash=\($0.hash) url=\($0.remoteURL)"
+        } ?? ""
+        return "update: Seasun manifest hash diff remove=\(plan.removedPaks.count) add=\(plan.addedPaks.count)\(firstRemoval)\(firstAddition); file removal/download is not performed on iOS"
+    }
+
+    private func seasunIntegrityPlanningSteps(
+        client: GameClientDescriptor,
+        installDirectory: String,
+        state: ChannelClientState
+    ) -> [SimulationStep] {
+        guard client.gameType == "cbjq" else {
+            return []
+        }
+        guard let manifest = remoteSeasunManifest(for: client) ?? state.virtualManifestMetadata else {
+            return [
+                SimulationStep(
+                    "Planning Seasun integrity scan",
+                    progress: 0.12,
+                    log: "integrity: Seasun manifest metadata is unavailable; no pak scan entries can be represented"
+                )
+            ]
+        }
+        guard !manifest.paks.isEmpty else {
+            return [
+                SimulationStep(
+                    "Planning Seasun integrity scan",
+                    progress: 0.12,
+                    log: "integrity: Seasun manifest summary paks=\(manifest.pakCount) payload_bytes=\(manifest.payloadBytes) is represented; full name/hash/size entries are unavailable"
+                )
+            ]
+        }
+
+        let plan = SeasunManifestIntegrityPlan.make(
+            manifest: manifest,
+            gameDirectory: installDirectory,
+            dlcBaseURL: client.server.dlcBaseURL ?? ""
+        )
+        return [
+            SimulationStep(
+                "Planning Seasun integrity scan",
+                progress: 0.12,
+                log: seasunIntegrityPlanLog(plan)
+            )
+        ]
+    }
+
+    private func seasunIntegrityPlanLog(_ plan: SeasunManifestIntegrityPlan) -> String {
+        let firstEntry = plan.entries.first.map {
+            " first=\($0.remoteName) md5=\($0.md5) size=\($0.fileSize) repair_url=\($0.repairURL)"
+        } ?? ""
+        return "integrity: Seasun manifest scan entries=\(plan.entries.count)\(firstEntry); local file size/md5 reads and repair downloads are not performed on iOS"
+    }
+
+    private func remoteSeasunManifest(for client: GameClientDescriptor) -> VirtualInstallManifestMetadata? {
+        client.seasunManifestMetadata
+            ?? VirtualInstallManifestMetadata(client: client, projectVersion: client.latestVersion)
     }
 
     private func initEnvironmentSteps(
@@ -1155,8 +1281,11 @@ struct LauncherSimulationService: Sendable {
     }
 
     private func seasunManifestMetadataLog(for client: GameClientDescriptor) -> String {
-        let manifestSummary = client.server.manifestSummary ?? "manifest metadata unavailable"
-        let projectVersion = " projectVersion=\(client.latestVersion)"
+        let manifest = remoteSeasunManifest(for: client)
+        let manifestSummary = manifest.map {
+            "manifest=\(client.server.manifestURL ?? "unknown") dlc=\(client.server.dlcBaseURL ?? "unknown") version=\($0.manifestVersion) pathOffset=\($0.pathOffset) paks=\($0.pakCount) payload_bytes=\($0.payloadBytes)"
+        } ?? client.server.manifestSummary ?? "manifest metadata unavailable"
+        let projectVersion = " projectVersion=\(manifest?.projectVersion ?? client.latestVersion)"
         let channel = client.server.desktopServerChannel.map { " channel=\($0)" } ?? ""
         let compatibility = client.server.compatibilityNote.map { " note=\($0)" } ?? ""
         return "\(manifestSummary)\(projectVersion)\(channel)\(compatibility)"

@@ -173,6 +173,12 @@ final class GameClientRuntimeMetadataTests: XCTestCase {
 
         XCTAssertEqual(client.latestVersion, "2.2.0")
         XCTAssertEqual(client.installSize, "3.5 GiB")
+        XCTAssertEqual(client.seasunManifestMetadata?.manifestVersion, "manifest-2026-07-07")
+        XCTAssertEqual(client.seasunManifestMetadata?.projectVersion, "2.2.0")
+        XCTAssertEqual(client.seasunManifestMetadata?.pathOffset, "assets")
+        XCTAssertEqual(client.seasunManifestMetadata?.sourceServerID, cbjq.serverID)
+        XCTAssertEqual(client.seasunManifestMetadata?.channel, cbjq.server.desktopServerChannel)
+        XCTAssertEqual(client.seasunManifestMetadata?.paks.map(\.hash), ["aaa", "bbb"])
         XCTAssertFalse(client.predownloadAvailable)
         XCTAssertTrue(channel.updateRequired(in: installedState(for: client, currentVersion: "2.0.0")))
         XCTAssertEqual(PredownloadArchiveMarker.markers(for: client), [])

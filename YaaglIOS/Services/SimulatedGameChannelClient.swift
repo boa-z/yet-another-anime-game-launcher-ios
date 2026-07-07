@@ -181,6 +181,9 @@ struct SimulatedGameChannelClient: GameChannelClient {
         if let manifestMetadata {
             return manifestMetadata
         }
+        if let manifestMetadata = descriptor.seasunManifestMetadata {
+            return manifestMetadata
+        }
         guard useDescriptorFallback else {
             return nil
         }

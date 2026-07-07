@@ -531,20 +531,90 @@ final class LauncherSimulationServiceTests: XCTestCase {
                 $0.contains("channel=seasun")
         })
 
-        let updateLogs = try await logs(
+        var localManifestState = installedState(for: cbjq, at: directory, currentVersion: "2.0.0")
+        localManifestState.virtualManifestMetadata = seasunManifest(
+            version: "2.0.0.50",
+            projectVersion: "2.0.0",
+            paks: [
+                seasunPak(name: "renamed-local.pak", hash: "same-hash"),
+                seasunPak(name: "same-name-old.pak", hash: "old-hash"),
+                seasunPak(name: "local-only.pak", hash: "local-hash")
+            ]
+        )
+        let cbjqWithRemoteManifest = cbjq.applying(
+            runtimeMetadata: GameClientRuntimeMetadata(
+                seasunManifestMetadata: seasunManifest(
+                    version: "2.1.0.83",
+                    projectVersion: "2.1.0",
+                    paks: [
+                        seasunPak(name: "renamed-remote.pak", hash: "same-hash"),
+                        seasunPak(name: "same-name-old.pak", hash: "new-hash"),
+                        seasunPak(name: "remote-only.pak", hash: "remote-hash")
+                    ]
+                )
+            )
+        )
+
+        let updateCommands = try await collect(
+            service.makeProgram(
+                action: .update,
+                client: cbjqWithRemoteManifest,
+                configuration: launchSnapshot(),
+                installDirectory: directory,
+                state: localManifestState
+            )
+        )
+        let updateLogs = updateCommands.compactMap(\.log)
+        XCTAssertTrue(updateLogs.contains("update: Seasun manifest diff compares local manifest.json paks by hash, removes stale paks, and downloads missing paks via Aria2"))
+        XCTAssertTrue(updateLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
+        XCTAssertFalse(updateLogs.contains { $0.contains("hpatchz") })
+        XCTAssertTrue(updateLogs.contains("update: Seasun pak downloads and manifest.json writes are disabled"))
+        XCTAssertTrue(updateLogs.contains {
+            $0.contains("update: Seasun manifest hash diff remove=2 add=2") &&
+                $0.contains("first_remove=same-name-old.pak") &&
+                $0.contains("first_add=same-name-old.pak") &&
+                $0.contains("hash=new-hash") &&
+                $0.contains("url=https://snowbreak-dl.amazingseasuncdn.com/6e5452634164107ee3c3cfd6efcdf55f/PC/updates/assets/new-hash") &&
+                !$0.contains("renamed-remote.pak")
+        })
+        XCTAssertTrue(updateLogs.contains("update: stale pak removal, manifest.json rewrite, and patched marker clear are simulated"))
+        XCTAssertEqual(updateCommands.compactMap(\.virtualPatchState), [false])
+
+        let summaryOnlyUpdateLogs = try await logs(
             service.makeProgram(
                 action: .update,
                 client: cbjq,
                 configuration: launchSnapshot(),
                 installDirectory: directory,
-                state: installedState(for: cbjq, at: directory, currentVersion: "2.0.0")
+                state: localManifestState
             )
         )
-        XCTAssertTrue(updateLogs.contains("update: Seasun manifest diff compares local manifest.json paks by hash, removes stale paks, and downloads missing paks via Aria2"))
-        XCTAssertTrue(updateLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
-        XCTAssertFalse(updateLogs.contains { $0.contains("hpatchz") })
-        XCTAssertTrue(updateLogs.contains("update: Seasun pak downloads and manifest.json writes are disabled"))
-        XCTAssertTrue(updateLogs.contains("update: stale pak removal, manifest.json rewrite, and patched marker clear are simulated"))
+        XCTAssertTrue(summaryOnlyUpdateLogs.contains("update: Seasun manifest summary local_paks=3 remote_paks=1473 is represented; remote full pak hash list is unavailable"))
+        XCTAssertFalse(summaryOnlyUpdateLogs.contains { $0.contains("Seasun manifest hash diff remove=") })
+
+        let integrityCommands = try await collect(
+            service.makeProgram(
+                action: .checkIntegrity,
+                client: cbjqWithRemoteManifest,
+                configuration: launchSnapshot(),
+                installDirectory: directory,
+                state: localManifestState
+            )
+        )
+        let integrityLogs = integrityCommands.compactMap(\.log)
+        XCTAssertTrue(integrityLogs.contains("integrity: Seasun manifest paks size/md5 scan and Aria2 repair downloads are simulated"))
+        XCTAssertTrue(integrityLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
+        XCTAssertTrue(integrityLogs.contains {
+            $0.contains("integrity: Seasun manifest scan entries=3") &&
+                $0.contains("first=renamed-remote.pak") &&
+                $0.contains("md5=same-hash") &&
+                $0.contains("size=1") &&
+                $0.contains("repair_url=https://snowbreak-dl.amazingseasuncdn.com/6e5452634164107ee3c3cfd6efcdf55f/PC/updates/assets/same-hash")
+        })
+        XCTAssertTrue(integrityLogs.contains("integrity: local files were not read or repaired"))
+        XCTAssertFalse(integrityLogs.contains { $0.contains("hpatchz") })
+        XCTAssertFalse(integrityLogs.contains { $0.contains("Sophon") })
+        XCTAssertEqual(integrityCommands.compactMap(\.virtualPatchState), [false])
 
         let blockedLaunchCommands = try await collect(
             service.makeProgram(
@@ -673,6 +743,39 @@ final class LauncherSimulationServiceTests: XCTestCase {
             currentVersion: currentVersion ?? client.latestVersion,
             predownloadedAll: false,
             requiresPatchRevert: false
+        )
+    }
+
+    @MainActor
+    private func seasunManifest(
+        version: String,
+        projectVersion: String,
+        paks: [VirtualInstallManifestMetadata.Pak]
+    ) -> VirtualInstallManifestMetadata {
+        VirtualInstallManifestMetadata(
+            manifestVersion: version,
+            projectVersion: projectVersion,
+            pathOffset: "assets",
+            paks: paks,
+            sourceServerID: "CBJQ",
+            channel: "seasun"
+        )
+    }
+
+    @MainActor
+    private func seasunPak(
+        name: String,
+        hash: String,
+        sizeInBytes: Int64 = 1
+    ) -> VirtualInstallManifestMetadata.Pak {
+        VirtualInstallManifestMetadata.Pak(
+            name: name,
+            hash: hash,
+            sizeInBytes: sizeInBytes,
+            bPrimary: false,
+            base: "",
+            diff: "",
+            diffSizeBytes: "0"
         )
     }
 
