@@ -286,13 +286,18 @@ final class LauncherConfiguration {
         return metadata
     }
 
-    func requestWineDistributionUpdate(id distroID: String) {
+    func wineDistributionSelectionRequiresConfirmation(_ distroID: String) -> Bool {
+        distroID != wineDistributionSelection
+    }
+
+    @discardableResult
+    func requestWineDistributionUpdate(id distroID: String) -> WineDistributionUpdateNotice? {
         guard distroID != wineDistro else {
             clearPendingWineUpdate()
-            return
+            return nil
         }
 
-        markWineUpdatePending(for: distroID)
+        return markWineUpdatePending(for: distroID)
     }
 
     func useDefaultWineDistribution(id distroID: String) {
@@ -349,15 +354,16 @@ final class LauncherConfiguration {
         wineDistro = distroID
     }
 
-    private func markWineUpdatePending(for distroID: String) {
+    private func markWineUpdatePending(for distroID: String) -> WineDistributionUpdateNotice? {
         guard let distribution = WineDistribution.distribution(id: distroID) else {
             clearPendingWineUpdate()
-            return
+            return nil
         }
 
         wineState = .update
         wineUpdateTag = distribution.id
         wineUpdateURL = distribution.remoteURL
+        return .relaunchRequired
     }
 
     private func clearPendingWineUpdate() {

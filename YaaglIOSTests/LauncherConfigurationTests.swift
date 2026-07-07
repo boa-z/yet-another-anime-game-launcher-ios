@@ -301,10 +301,14 @@ final class LauncherConfigurationTests: XCTestCase {
         let defaults = makeDefaults()
         let configuration = LauncherConfiguration(defaults: defaults)
 
-        configuration.requestWineDistributionUpdate(id: "11.8-dxmt-signed-experimental")
+        XCTAssertFalse(configuration.wineDistributionSelectionRequiresConfirmation(WineDistribution.defaultID))
+        XCTAssertTrue(configuration.wineDistributionSelectionRequiresConfirmation("11.8-dxmt-signed-experimental"))
+
+        let notice = configuration.requestWineDistributionUpdate(id: "11.8-dxmt-signed-experimental")
 
         XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
         XCTAssertNil(defaults.string(forKey: "wine_tag"))
+        XCTAssertEqual(notice, .relaunchRequired)
         XCTAssertEqual(defaults.string(forKey: "wine_state"), "update")
         XCTAssertEqual(defaults.string(forKey: "wine_update_tag"), "11.8-dxmt-signed-experimental")
         XCTAssertEqual(
@@ -312,6 +316,7 @@ final class LauncherConfigurationTests: XCTestCase {
             "https://github.com/yaagl/anime-game-wine/releases/download/wine-11.8-signed/wine-devel-11.8-osx64-signed.tar.xz"
         )
         XCTAssertEqual(configuration.wineDistributionSelection, "11.8-dxmt-signed-experimental")
+        XCTAssertFalse(configuration.wineDistributionSelectionRequiresConfirmation("11.8-dxmt-signed-experimental"))
         XCTAssertEqual(configuration.pendingWineDistribution?.id, "11.8-dxmt-signed-experimental")
         XCTAssertEqual(configuration.snapshot.wineDistro, WineDistribution.defaultID)
         XCTAssertEqual(configuration.snapshot.wineState, .update)
@@ -324,8 +329,9 @@ final class LauncherConfigurationTests: XCTestCase {
         let configuration = LauncherConfiguration(defaults: defaults)
 
         configuration.requestWineDistributionUpdate(id: "11.8-dxmt-signed-experimental")
-        configuration.requestWineDistributionUpdate(id: WineDistribution.defaultID)
+        let notice = configuration.requestWineDistributionUpdate(id: WineDistribution.defaultID)
 
+        XCTAssertNil(notice)
         XCTAssertEqual(configuration.wineDistro, WineDistribution.defaultID)
         XCTAssertEqual(configuration.wineState, .ready)
         XCTAssertEqual(configuration.wineDistributionSelection, WineDistribution.defaultID)
