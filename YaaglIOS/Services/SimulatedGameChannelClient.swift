@@ -66,7 +66,12 @@ struct SimulatedGameChannelClient: GameChannelClient {
             nextState.predownloadedAll = false
             nextState.predownloadedArchiveKeys = []
             nextState.requiresPatchRevert = false
-            applyVirtualMetadata(to: &nextState, version: descriptor.latestVersion, useDescriptorManifestFallback: true)
+            applyVirtualMetadata(
+                to: &nextState,
+                version: descriptor.latestVersion,
+                useDescriptorConfigFallback: descriptor.gameType != "bh3",
+                useDescriptorManifestFallback: true
+            )
         case .importExisting:
             nextState = stateAfterImport(currentState: currentState, context: context)
         case .update:
@@ -75,7 +80,12 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 nextState.predownloadedAll = false
                 nextState.predownloadedArchiveKeys = []
                 nextState.requiresPatchRevert = false
-                applyVirtualMetadata(to: &nextState, version: descriptor.latestVersion, useDescriptorManifestFallback: true)
+                applyVirtualMetadata(
+                    to: &nextState,
+                    version: descriptor.latestVersion,
+                    useDescriptorConfigFallback: true,
+                    useDescriptorManifestFallback: true
+                )
             } else {
                 nextState = .empty
             }
@@ -112,7 +122,10 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 currentVersion: descriptor.latestVersion,
                 predownloadedAll: false,
                 requiresPatchRevert: false,
-                virtualInstallMetadata: virtualConfigMetadata(version: descriptor.latestVersion),
+                virtualInstallMetadata: virtualConfigMetadata(
+                    version: descriptor.latestVersion,
+                    useDescriptorFallback: descriptor.gameType != "bh3"
+                ),
                 virtualManifestMetadata: virtualManifestMetadata(
                     version: descriptor.latestVersion,
                     useDescriptorFallback: true
@@ -137,7 +150,11 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 currentVersion: version,
                 predownloadedAll: false,
                 requiresPatchRevert: false,
-                virtualInstallMetadata: virtualConfigMetadata(version: version, metadata: metadata),
+                virtualInstallMetadata: virtualConfigMetadata(
+                    version: version,
+                    metadata: metadata,
+                    useDescriptorFallback: descriptor.gameType != "bh3"
+                ),
                 virtualManifestMetadata: virtualManifestMetadata(
                     version: version,
                     manifestMetadata: manifestMetadata,
@@ -151,9 +168,13 @@ struct SimulatedGameChannelClient: GameChannelClient {
     private func applyVirtualMetadata(
         to state: inout ChannelClientState,
         version: String,
+        useDescriptorConfigFallback: Bool,
         useDescriptorManifestFallback: Bool
     ) {
-        state.virtualInstallMetadata = virtualConfigMetadata(version: version)
+        state.virtualInstallMetadata = virtualConfigMetadata(
+            version: version,
+            useDescriptorFallback: useDescriptorConfigFallback
+        )
         state.virtualManifestMetadata = virtualManifestMetadata(
             version: version,
             useDescriptorFallback: useDescriptorManifestFallback
@@ -162,12 +183,19 @@ struct SimulatedGameChannelClient: GameChannelClient {
 
     private func virtualConfigMetadata(
         version: String,
-        metadata: VirtualInstallMetadata? = nil
+        metadata: VirtualInstallMetadata? = nil,
+        useDescriptorFallback: Bool
     ) -> VirtualInstallMetadata? {
         if descriptor.gameType == "cbjq" {
             return nil
         }
-        return metadata ?? VirtualInstallMetadata(client: descriptor, gameVersion: version)
+        if let metadata {
+            return metadata
+        }
+        guard useDescriptorFallback else {
+            return nil
+        }
+        return VirtualInstallMetadata(client: descriptor, gameVersion: version)
     }
 
     private func virtualManifestMetadata(

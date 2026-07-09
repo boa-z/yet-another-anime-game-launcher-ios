@@ -83,7 +83,7 @@ struct LauncherSimulationService: Sendable {
             SimulationStep("Blocked desktop sidecar execution", progress: 0.16, log: sidecarBlockLog(for: client, action: .install)),
             SimulationStep("Blocked game resource download for \(client.shortTitle)", progress: 0.18, log: installDownloadBlockLog(for: client)),
             SimulationStep("Writing desktop metadata", progress: 0.42, log: desktopConfigMetadataLog(for: client, version: client.latestVersion, action: "install")),
-            SimulationStep("Creating virtual installation record", progress: 0.62, log: "install: config.ini/package version writes are represented by UserDefaults only"),
+            SimulationStep("Creating virtual installation record", progress: 0.62, log: installRecordLog(for: client)),
             SimulationStep("Saving current version \(client.latestVersion)", progress: 0.86),
             SimulationStep("Install simulation complete", progress: 1.0)
         ]
@@ -166,7 +166,7 @@ struct LauncherSimulationService: Sendable {
         case "hkrpg":
             "install: Aria2 segmented 7z download to .ariatmp, doStreamUn7z, cleanup, and config.ini write are simulated"
         case "bh3":
-            "install: Aria2 game.7z download to .ariatmp, extract7z, and config.ini write are simulated"
+            "install: Aria2 game.7z download to .ariatmp and extract7z are simulated; desktop does not write config.ini on fresh BH3 install"
         default:
             "install: desktop install pipeline is simulated"
         }
@@ -230,9 +230,20 @@ struct LauncherSimulationService: Sendable {
         case "cbjq":
             return "\(action): Seasun manifest metadata \(seasunManifestMetadataLog(for: client)) is represented without reading or writing manifest.json"
         case "bh3" where action == "install":
-            return "\(action): desktop server metadata \(fields) is retained; BH3 config.ini rewrite is simulated on update"
+            return "\(action): desktop BH3 install does not write config.ini; server metadata \(fields) is retained only for update simulation"
         default:
             return "\(action): config.ini [General] \(fields) is simulated"
+        }
+    }
+
+    private func installRecordLog(for client: GameClientDescriptor) -> String {
+        switch client.gameType {
+        case "bh3":
+            "install: BH3 virtual record tracks version only; config.ini metadata remains absent until update or explicit import"
+        case "cbjq":
+            "install: manifest metadata writes are represented by UserDefaults only"
+        default:
+            "install: config.ini/package version writes are represented by UserDefaults only"
         }
     }
 

@@ -40,6 +40,23 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testBH3FreshInstallDoesNotInventConfigMetadata() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let bh3 = try XCTUnwrap(viewModel.clients.first { $0.id == "bh3_global" })
+        viewModel.selectedClientID = bh3.id
+
+        await viewModel.runPrimaryAction()
+
+        let savedState = ChannelClientStore(defaults: defaults).load(for: bh3.id)
+        XCTAssertEqual(savedState.installState, .installed)
+        XCTAssertEqual(savedState.currentVersion, bh3.latestVersion)
+        XCTAssertNil(savedState.virtualInstallMetadata)
+        XCTAssertNil(savedState.virtualManifestMetadata)
+    }
+
+    @MainActor
     func testOutdatedVirtualInstallUpdatesToLatestVersion() async {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
@@ -60,6 +77,29 @@ final class LauncherViewModelTests: XCTestCase {
             VirtualInstallMetadata(client: viewModel.selectedClient, gameVersion: viewModel.selectedClient.latestVersion)
         )
         XCTAssertNil(ChannelClientStore(defaults: defaults).load(for: viewModel.selectedClient.id).virtualManifestMetadata)
+    }
+
+    @MainActor
+    func testBH3UpdateWritesDesktopConfigMetadata() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let bh3 = try XCTUnwrap(viewModel.clients.first { $0.id == "bh3_global" })
+        viewModel.selectedClientID = bh3.id
+        viewModel.installState = .installed
+        viewModel.installDirectory = "iOS Sandbox/VirtualGameData/bh3_global"
+        viewModel.currentVersion = "8.3.0"
+
+        XCTAssertEqual(viewModel.primaryAction, .update)
+
+        await viewModel.runPrimaryAction()
+
+        let savedState = ChannelClientStore(defaults: defaults).load(for: bh3.id)
+        XCTAssertEqual(savedState.currentVersion, bh3.latestVersion)
+        XCTAssertEqual(
+            savedState.virtualInstallMetadata,
+            VirtualInstallMetadata(client: bh3, gameVersion: bh3.latestVersion)
+        )
     }
 
     @MainActor
@@ -568,6 +608,34 @@ final class LauncherViewModelTests: XCTestCase {
             store.load(for: viewModel.selectedClient.id).virtualInstallMetadata,
             VirtualInstallMetadata(client: viewModel.selectedClient, gameVersion: "5.2.0")
         )
+    }
+
+    @MainActor
+    func testStoredBH3ProbeRefreshDoesNotInventConfigMetadata() throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let bh3 = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+        defaults.set(bh3.id, forKey: "selected_client_id")
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "Imported/BH3Refresh",
+                currentVersion: "7.5.0",
+                predownloadedAll: false,
+                requiresPatchRevert: false
+            ),
+            for: bh3.id
+        )
+
+        let viewModel = makeViewModel(
+            defaults: defaults,
+            installProbe: VirtualInstallProbe { _, _, _ in .existing(version: "7.5.0") }
+        )
+
+        XCTAssertEqual(viewModel.selectedClientID, bh3.id)
+        XCTAssertEqual(viewModel.installState, .installed)
+        XCTAssertNil(store.load(for: bh3.id).virtualInstallMetadata)
     }
 
     @MainActor

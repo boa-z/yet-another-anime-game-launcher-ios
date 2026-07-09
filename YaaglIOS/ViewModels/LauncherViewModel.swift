@@ -468,7 +468,13 @@ final class LauncherViewModel {
         if client.gameType == "cbjq" {
             return nil
         }
-        return metadata ?? VirtualInstallMetadata(client: client, gameVersion: version)
+        if let metadata {
+            return metadata
+        }
+        guard client.gameType != "bh3" else {
+            return nil
+        }
+        return VirtualInstallMetadata(client: client, gameVersion: version)
     }
 
     private func virtualManifestMetadata(

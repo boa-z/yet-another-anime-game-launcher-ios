@@ -89,7 +89,11 @@ struct VirtualInstallSnippetParser: Sendable {
             return unreadable("pkg_version snippet did not include a game version", source: .packageVersion)
         }
 
-        return detected(version, metadata: VirtualInstallMetadata(client: client, gameVersion: version), source: .packageVersion)
+        return detected(
+            version,
+            metadata: synthesizedConfigMetadata(for: client, version: version),
+            source: .packageVersion
+        )
     }
 
     private func parseManifestJSON(
@@ -123,7 +127,11 @@ struct VirtualInstallSnippetParser: Sendable {
                     )
                 }
 
-                return detected(version, metadata: VirtualInstallMetadata(client: client, gameVersion: version), source: .manifestJSON)
+                return detected(
+                    version,
+                    metadata: synthesizedConfigMetadata(for: client, version: version),
+                    source: .manifestJSON
+                )
             }
         }
 
@@ -357,6 +365,16 @@ struct VirtualInstallSnippetParser: Sendable {
 
     private func mostConservativeVersion(from versions: [String]) -> String? {
         versions.min { SemanticVersion($0) < SemanticVersion($1) }
+    }
+
+    private func synthesizedConfigMetadata(
+        for client: GameClientDescriptor,
+        version: String
+    ) -> VirtualInstallMetadata? {
+        if client.gameType == "bh3" {
+            return nil
+        }
+        return VirtualInstallMetadata(client: client, gameVersion: version)
     }
 
     private func detected(

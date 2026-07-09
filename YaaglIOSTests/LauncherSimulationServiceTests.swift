@@ -195,8 +195,9 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(napLogs.contains("sidecar: aria2 metadata mirrors ./sidecar/aria2/aria2c; install archives, pre-download archives, patch archives, launcher assets, dependency assets are not bundled or executed on iOS"))
         XCTAssertTrue(napLogs.contains("install: config.ini [General] game_version=3.0.0 channel=1 sub_channel=0 cps=<NAP_CPS> is simulated"))
         XCTAssertTrue(hkrpgLogs.contains("install: Aria2 segmented 7z download to .ariatmp, doStreamUn7z, cleanup, and config.ini write are simulated"))
-        XCTAssertTrue(bh3Logs.contains("install: Aria2 game.7z download to .ariatmp, extract7z, and config.ini write are simulated"))
-        XCTAssertTrue(bh3Logs.contains("install: desktop server metadata game_version=8.4.0 channel=0 sub_channel=0 cps= is retained; BH3 config.ini rewrite is simulated on update"))
+        XCTAssertTrue(bh3Logs.contains("install: Aria2 game.7z download to .ariatmp and extract7z are simulated; desktop does not write config.ini on fresh BH3 install"))
+        XCTAssertTrue(bh3Logs.contains("install: desktop BH3 install does not write config.ini; server metadata game_version=8.4.0 channel=0 sub_channel=0 cps= is retained only for update simulation"))
+        XCTAssertTrue(bh3Logs.contains("install: BH3 virtual record tracks version only; config.ini metadata remains absent until update or explicit import"))
         XCTAssertTrue(bh3Logs.contains("install: real Aria2 game archive download is disabled on iOS"))
     }
 

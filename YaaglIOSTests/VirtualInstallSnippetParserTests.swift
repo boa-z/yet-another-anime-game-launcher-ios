@@ -55,6 +55,26 @@ final class VirtualInstallSnippetParserTests: XCTestCase {
         XCTAssertEqual(result.detectedVersion, "2.9.0")
     }
 
+    @MainActor
+    func testBH3PackageVersionDoesNotInventConfigMetadata() throws {
+        let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+        let result = parser.parse(
+            """
+            {"remoteName":"BH3.exe","fileSize":"1","version":"7.5.0"}
+            """,
+            for: client
+        )
+
+        XCTAssertEqual(result.source, .packageVersion)
+        guard case .existing(let version, let metadata, let manifestMetadata) = result.probeResult else {
+            return XCTFail("Expected an existing virtual install probe result")
+        }
+
+        XCTAssertEqual(version, "7.5.0")
+        XCTAssertNil(metadata)
+        XCTAssertNil(manifestMetadata)
+    }
+
     func testPackageVersionWithoutVersionStaysUnreadable() throws {
         let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hk4e_cn" })
         let result = parser.parse(
@@ -164,6 +184,67 @@ final class VirtualInstallSnippetParserTests: XCTestCase {
 
         XCTAssertEqual(result.source, .manifestJSON)
         XCTAssertEqual(result.detectedVersion, "4.3.0")
+    }
+
+    @MainActor
+    func testBH3ManifestVersionDoesNotInventConfigMetadata() throws {
+        let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+        let result = parser.parse(
+            """
+            {
+              "data": {
+                "game": {
+                  "latest": {
+                    "version": "7.5.0"
+                  }
+                }
+              }
+            }
+            """,
+            for: client
+        )
+
+        XCTAssertEqual(result.source, .manifestJSON)
+        guard case .existing(let version, let metadata, let manifestMetadata) = result.probeResult else {
+            return XCTFail("Expected an existing virtual install probe result")
+        }
+
+        XCTAssertEqual(version, "7.5.0")
+        XCTAssertNil(metadata)
+        XCTAssertNil(manifestMetadata)
+    }
+
+    @MainActor
+    func testBH3ConfigINIStillPreservesPastedMetadata() throws {
+        let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+        let result = parser.parse(
+            """
+            [General]
+            game_version=7.5.0
+            channel=0
+            sub_channel=0
+            cps=
+            """,
+            for: client
+        )
+
+        XCTAssertEqual(result.source, .configINI)
+        guard case .existing(let version, let metadata, let manifestMetadata) = result.probeResult else {
+            return XCTFail("Expected an existing virtual install probe result")
+        }
+
+        XCTAssertEqual(version, "7.5.0")
+        XCTAssertEqual(
+            metadata,
+            VirtualInstallMetadata(
+                gameVersion: "7.5.0",
+                channelID: 0,
+                subchannelID: 0,
+                cpsReference: "",
+                sourceServerID: client.serverID
+            )
+        )
+        XCTAssertNil(manifestMetadata)
     }
 
     @MainActor
