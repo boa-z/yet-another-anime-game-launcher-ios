@@ -639,6 +639,43 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testStoredBH3ProbeRefreshPreservesExplicitConfigMetadata() throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let bh3 = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
+        defaults.set(bh3.id, forKey: "selected_client_id")
+        let metadata = VirtualInstallMetadata(
+            gameVersion: "7.5.0",
+            channelID: 0,
+            subchannelID: 0,
+            cpsReference: "",
+            sourceServerID: bh3.serverID
+        )
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "Imported/BH3Config",
+                currentVersion: "7.5.0",
+                predownloadedAll: false,
+                requiresPatchRevert: false
+            ),
+            for: bh3.id
+        )
+
+        let viewModel = makeViewModel(
+            defaults: defaults,
+            installProbe: VirtualInstallProbe { _, _, _ in
+                .existing(version: "7.5.0", metadata: metadata)
+            }
+        )
+
+        XCTAssertEqual(viewModel.selectedClientID, bh3.id)
+        XCTAssertEqual(viewModel.installState, .installed)
+        XCTAssertEqual(store.load(for: bh3.id).virtualInstallMetadata, metadata)
+    }
+
+    @MainActor
     func testCBJQUnsupportedLaunchIsBlockedBeforeSideEffects() async throws {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
