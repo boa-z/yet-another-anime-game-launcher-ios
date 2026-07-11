@@ -1076,15 +1076,6 @@ struct LauncherSimulationService: Sendable {
         guard client.gameType == "cbjq" else {
             return []
         }
-        guard let localManifest = state.virtualManifestMetadata else {
-            return [
-                SimulationStep(
-                    "Planning Seasun manifest diff",
-                    progress: 0.34,
-                    log: "update: local manifest.json metadata is unavailable; desktop would treat the local pak list as empty"
-                )
-            ]
-        }
         guard let remoteManifest = remoteSeasunManifest(for: client) else {
             return [
                 SimulationStep(
@@ -1099,13 +1090,13 @@ struct LauncherSimulationService: Sendable {
                 SimulationStep(
                     "Planning Seasun manifest diff",
                     progress: 0.34,
-                    log: "update: Seasun manifest summary local_paks=\(localManifest.pakCount) remote_paks=\(remoteManifest.pakCount) is represented; remote full pak hash list is unavailable"
+                    log: "update: Seasun manifest summary local_paks=\(state.virtualManifestMetadata?.pakCount ?? 0) remote_paks=\(remoteManifest.pakCount) is represented; remote full pak hash list is unavailable"
                 )
             ]
         }
 
         let plan = SeasunManifestUpdatePlan.make(
-            local: localManifest,
+            local: state.virtualManifestMetadata,
             remote: remoteManifest,
             gameDirectory: state.installDirectory,
             dlcBaseURL: client.server.dlcBaseURL ?? ""
@@ -1120,11 +1111,14 @@ struct LauncherSimulationService: Sendable {
     }
 
     private func seasunUpdatePlanLog(_ plan: SeasunManifestUpdatePlan) -> String {
+        let localFallback = plan.usedEmptyLocalManifestFallback
+            ? " local manifest.json metadata is unavailable, so desktop empty-pak fallback applies;"
+            : ""
         let firstRemoval = plan.removedPaks.first.map { " first_remove=\($0.localName)" } ?? ""
         let firstAddition = plan.addedPaks.first.map {
             " first_add=\($0.remoteName) hash=\($0.hash) url=\($0.remoteURL)"
         } ?? ""
-        return "update: Seasun manifest hash diff remove=\(plan.removedPaks.count) add=\(plan.addedPaks.count)\(firstRemoval)\(firstAddition); file removal/download is not performed on iOS"
+        return "update:\(localFallback) Seasun manifest hash diff remove=\(plan.removedPaks.count) add=\(plan.addedPaks.count)\(firstRemoval)\(firstAddition); file removal/download is not performed on iOS"
     }
 
     private func seasunIntegrityPlanningSteps(

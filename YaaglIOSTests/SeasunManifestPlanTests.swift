@@ -31,6 +31,28 @@ final class SeasunManifestPlanTests: XCTestCase {
         XCTAssertEqual(plan.addedPaks.map(\.hash), ["new-hash", "remote-hash"])
         XCTAssertFalse(plan.removedPaks.map(\.localName).contains("renamed-local.pak"))
         XCTAssertFalse(plan.addedPaks.map(\.remoteName).contains("renamed-remote.pak"))
+        XCTAssertFalse(plan.usedEmptyLocalManifestFallback)
+    }
+
+    func testUpdatePlanTreatsMissingLocalManifestAsEmptyPakList() {
+        let remote = manifest(
+            paks: [
+                pak(name: "base.pak", hash: "base-hash"),
+                pak(name: "patch.pak", hash: "patch-hash")
+            ]
+        )
+
+        let plan = SeasunManifestUpdatePlan.make(
+            local: nil,
+            remote: remote,
+            gameDirectory: "GameDir",
+            dlcBaseURL: "https://example.test/updates"
+        )
+
+        XCTAssertTrue(plan.usedEmptyLocalManifestFallback)
+        XCTAssertEqual(plan.removedPaks, [])
+        XCTAssertEqual(plan.addedPaks.map(\.remoteName), ["base.pak", "patch.pak"])
+        XCTAssertEqual(plan.addedPaks.map(\.hash), ["base-hash", "patch-hash"])
     }
 
     func testUpdatePlanBuildsDesktopShapedURLsFromHash() {

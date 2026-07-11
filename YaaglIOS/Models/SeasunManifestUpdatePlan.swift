@@ -15,14 +15,15 @@ struct SeasunManifestUpdatePlan: Equatable, Sendable {
 
     var addedPaks: [AddedPak]
     var removedPaks: [RemovedPak]
+    var usedEmptyLocalManifestFallback: Bool
 
     static func make(
-        local: VirtualInstallManifestMetadata,
+        local: VirtualInstallManifestMetadata?,
         remote: VirtualInstallManifestMetadata,
         gameDirectory: String,
         dlcBaseURL: String
     ) -> SeasunManifestUpdatePlan {
-        let localPaks = normalizedPaks(local.paks)
+        let localPaks = normalizedPaks(local?.paks ?? [])
         let remotePaks = normalizedPaks(remote.paks)
         let localHashes = Set(localPaks.map(\.hash))
         let remoteHashes = Set(remotePaks.map(\.hash))
@@ -52,7 +53,8 @@ struct SeasunManifestUpdatePlan: Equatable, Sendable {
 
         return SeasunManifestUpdatePlan(
             addedPaks: addedPaks,
-            removedPaks: removedPaks
+            removedPaks: removedPaks,
+            usedEmptyLocalManifestFallback: local == nil
         )
     }
 

@@ -581,6 +581,24 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(updateLogs.contains("update: stale pak removal, manifest.json rewrite, and patched marker clear are simulated"))
         XCTAssertEqual(updateCommands.compactMap(\.virtualPatchState), [false])
 
+        var missingLocalManifestState = localManifestState
+        missingLocalManifestState.virtualManifestMetadata = nil
+        let missingLocalManifestLogs = try await logs(
+            service.makeProgram(
+                action: .update,
+                client: cbjqWithRemoteManifest,
+                configuration: launchSnapshot(),
+                installDirectory: directory,
+                state: missingLocalManifestState
+            )
+        )
+        XCTAssertTrue(missingLocalManifestLogs.contains {
+            $0.contains("local manifest.json metadata is unavailable, so desktop empty-pak fallback applies") &&
+                $0.contains("Seasun manifest hash diff remove=0 add=3") &&
+                $0.contains("first_add=renamed-remote.pak") &&
+                $0.contains("hash=same-hash")
+        })
+
         let summaryOnlyUpdateLogs = try await logs(
             service.makeProgram(
                 action: .update,
