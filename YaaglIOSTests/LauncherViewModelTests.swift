@@ -428,6 +428,26 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testNewTargetRejectsClientChangedAfterSelection() async throws {
+        let viewModel = makeViewModel()
+        let originalClientID = viewModel.selectedClient.id
+        let otherClient = try XCTUnwrap(viewModel.clients.first { $0.id == "hk4e_global" })
+        viewModel.selectedClientID = otherClient.id
+
+        await viewModel.useNewVirtualInstallTarget(
+            path: "iOS Sandbox/Imported/\(originalClientID)",
+            expectedClientID: originalClientID
+        )
+
+        XCTAssertEqual(viewModel.installState, .notInstalled)
+        XCTAssertEqual(viewModel.installDirectory, "")
+        XCTAssertEqual(viewModel.alertMessage, "Selected game changed; choose the install target again")
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "Install skipped: selected client changed after target selection"
+        })
+    }
+
+    @MainActor
     func testImportExistingPersistsParsedCBJQManifestMetadata() async throws {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
@@ -1171,6 +1191,38 @@ final class LauncherViewModelTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+}
+
+private extension LauncherViewModel {
+    func importExistingVirtualInstall(
+        path: String,
+        probeResult: VirtualInstallProbeResult,
+        expectedClientID: String? = nil
+    ) async {
+        if case .newTarget = probeResult {
+            await useNewVirtualInstallTarget(
+                path: path,
+                expectedClientID: expectedClientID ?? selectedClient.id
+            )
+            return
+        }
+
+        let source: VirtualInstallSnippetSource
+        if case .existing(_, _, let manifestMetadata) = probeResult, manifestMetadata != nil {
+            source = .manifestJSON
+        } else {
+            source = .configINI
+        }
+        await importExistingVirtualInstall(
+            VirtualInstallImportRequest(
+                path: path,
+                clientID: expectedClientID ?? selectedClient.id,
+                serverID: selectedClient.serverID,
+                source: source,
+                probeResult: probeResult
+            )
+        )
     }
 }
 

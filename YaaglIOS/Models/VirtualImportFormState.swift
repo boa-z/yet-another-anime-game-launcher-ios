@@ -17,7 +17,7 @@ struct VirtualImportFormState: Equatable, Sendable {
     }
 
     func canImportExisting(client: GameClientDescriptor, isBusy: Bool) -> Bool {
-        !isBusy && validatedProbeResult(client: client) != nil
+        !isBusy && existingImportRequest(client: client) != nil
     }
 
     mutating func reset(for client: GameClientDescriptor) {
@@ -70,7 +70,7 @@ struct VirtualImportFormState: Equatable, Sendable {
         }
     }
 
-    func validatedProbeResult(client: GameClientDescriptor) -> VirtualInstallProbeResult? {
+    func existingImportRequest(client: GameClientDescriptor) -> VirtualInstallImportRequest? {
         guard hasImportPath,
               !normalizedDetectedVersion.isEmpty,
               let evidence,
@@ -84,7 +84,13 @@ struct VirtualImportFormState: Equatable, Sendable {
         else {
             return nil
         }
-        return evidence.probeResult
+        return VirtualInstallImportRequest(
+            path: normalizedImportPath,
+            clientID: client.id,
+            serverID: client.serverID,
+            source: evidence.source,
+            probeResult: evidence.probeResult
+        )
     }
 
     private var normalizedImportPath: String {

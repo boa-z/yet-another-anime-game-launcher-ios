@@ -179,11 +179,47 @@ final class LauncherViewModel {
         await refreshLauncherUpdateMetadata(for: channelClient.descriptor)
     }
 
-    func importExistingVirtualInstall(
-        path: String,
-        probeResult: VirtualInstallProbeResult,
-        expectedClientID: String? = nil
-    ) async {
+    func importExistingVirtualInstall(_ request: VirtualInstallImportRequest) async {
+        let installDirectory = request.path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !installDirectory.isEmpty else {
+            alertMessage = "Import path is empty"
+            appendHistory(.importExisting, "Import skipped: empty virtual install path")
+            return
+        }
+
+        guard request.clientID == selectedClient.id,
+              request.serverID == selectedClient.serverID
+        else {
+            alertMessage = "Selected game changed; probe the install again"
+            appendHistory(.importExisting, "Import skipped: selected client changed after virtual install probe")
+            return
+        }
+
+        guard case .existing(let version, let metadata, let manifestMetadata) = request.probeResult else {
+            alertMessage = "Import probe did not identify an existing game"
+            appendHistory(.importExisting, "Import skipped: probe evidence is not an existing install")
+            return
+        }
+
+        let metadataMatches = metadata == nil
+            || (metadata?.gameVersion == version && metadata?.sourceServerID == selectedClient.serverID)
+        let manifestMatches = manifestMetadata == nil
+            || (manifestMetadata?.projectVersion == version
+                && manifestMetadata?.sourceServerID == selectedClient.serverID)
+        guard metadataMatches && manifestMatches else {
+            alertMessage = "Import metadata does not match the selected game"
+            appendHistory(.importExisting, "Import skipped: probe metadata does not match version or server")
+            return
+        }
+
+        await run(
+            .importExisting,
+            installDirectoryOverride: installDirectory,
+            importProbeResult: request.probeResult
+        )
+    }
+
+    func useNewVirtualInstallTarget(path: String, expectedClientID: String) async {
         let installDirectory = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !installDirectory.isEmpty else {
             alertMessage = "Import path is empty"
@@ -191,35 +227,13 @@ final class LauncherViewModel {
             return
         }
 
-        guard expectedClientID == nil || expectedClientID == selectedClient.id else {
-            alertMessage = "Selected game changed; probe the install again"
-            appendHistory(.importExisting, "Import skipped: selected client changed after virtual install probe")
+        guard expectedClientID == selectedClient.id else {
+            alertMessage = "Selected game changed; choose the install target again"
+            appendHistory(.importExisting, "Install skipped: selected client changed after target selection")
             return
         }
 
-        if case .existing(let version, let metadata, let manifestMetadata) = probeResult {
-            let metadataMatches = metadata == nil
-                || (metadata?.gameVersion == version && metadata?.sourceServerID == selectedClient.serverID)
-            let manifestMatches = manifestMetadata == nil
-                || (manifestMetadata?.projectVersion == version
-                    && manifestMetadata?.sourceServerID == selectedClient.serverID)
-            guard metadataMatches && manifestMatches else {
-                alertMessage = "Import metadata does not match the selected game"
-                appendHistory(.importExisting, "Import skipped: probe metadata does not match version or server")
-                return
-            }
-        }
-
-        switch probeResult {
-        case .newTarget:
-            await run(.install, installDirectoryOverride: installDirectory)
-        case .existing, .unreadable:
-            await run(
-                .importExisting,
-                installDirectoryOverride: installDirectory,
-                importProbeResult: probeResult
-            )
-        }
+        await run(.install, installDirectoryOverride: installDirectory)
     }
 
     func initializeEnvironment() async {

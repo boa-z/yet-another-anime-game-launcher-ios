@@ -71,25 +71,21 @@ struct VirtualImportSettingsView: View {
 
     private func importExisting() {
         let client = viewModel.selectedClient
-        guard let probeResult = form.validatedProbeResult(client: client) else {
+        guard let request = form.existingImportRequest(client: client) else {
             return
         }
-        let importPath = form.importPath
         Task {
-            await viewModel.importExistingVirtualInstall(
-                path: importPath,
-                probeResult: probeResult,
-                expectedClientID: client.id
-            )
+            await viewModel.importExistingVirtualInstall(request)
         }
     }
 
     private func useNewTarget() {
         let importPath = form.importPath
+        let clientID = viewModel.selectedClient.id
         Task {
-            await viewModel.importExistingVirtualInstall(
+            await viewModel.useNewVirtualInstallTarget(
                 path: importPath,
-                probeResult: .newTarget
+                expectedClientID: clientID
             )
         }
     }

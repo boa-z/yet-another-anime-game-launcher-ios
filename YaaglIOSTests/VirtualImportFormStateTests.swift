@@ -14,7 +14,7 @@ final class VirtualImportFormStateTests: XCTestCase {
         state.detectedVersion = "5.3.0"
 
         XCTAssertFalse(state.canImportExisting(client: client, isBusy: false))
-        XCTAssertNil(state.validatedProbeResult(client: client))
+        XCTAssertNil(state.existingImportRequest(client: client))
     }
 
     func testSuccessfulSnippetBindsImportEvidenceAndMetadata() throws {
@@ -34,7 +34,7 @@ final class VirtualImportFormStateTests: XCTestCase {
 
         XCTAssertEqual(state.detectedVersion, "5.3.0")
         XCTAssertTrue(state.canImportExisting(client: client, isBusy: false))
-        guard case .existing(let version, let metadata, _)? = state.validatedProbeResult(client: client) else {
+        guard case .existing(let version, let metadata, _)? = state.existingImportRequest(client: client)?.probeResult else {
             return XCTFail("Expected validated existing-install evidence")
         }
         XCTAssertEqual(version, "5.3.0")
@@ -100,7 +100,7 @@ final class VirtualImportFormStateTests: XCTestCase {
         state.apply(parser.parse(state.probeSnippet, for: client), client: client)
 
         XCTAssertFalse(state.canImportExisting(client: client, isBusy: false))
-        XCTAssertNil(state.validatedProbeResult(client: client))
+        XCTAssertNil(state.existingImportRequest(client: client))
     }
 
     func testUnattributedOrCrossServerResultCannotBecomeEvidence() throws {
@@ -118,7 +118,7 @@ final class VirtualImportFormStateTests: XCTestCase {
             ),
             client: client
         )
-        XCTAssertNil(state.validatedProbeResult(client: client))
+        XCTAssertNil(state.existingImportRequest(client: client))
 
         state.apply(
             VirtualInstallSnippetProbeResult(
@@ -137,7 +137,7 @@ final class VirtualImportFormStateTests: XCTestCase {
             ),
             client: client
         )
-        XCTAssertNil(state.validatedProbeResult(client: client))
+        XCTAssertNil(state.existingImportRequest(client: client))
     }
 
     private func probedState(for client: GameClientDescriptor) -> VirtualImportFormState {
