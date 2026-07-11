@@ -97,7 +97,11 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 break
             }
             nextState.requiresPatchRevert = false
-        case .checkIntegrity, .initEnvironment:
+        case .checkIntegrity:
+            if descriptor.desktopManualIntegrityClearsPatchMarker {
+                nextState.requiresPatchRevert = false
+            }
+        case .initEnvironment:
             nextState.requiresPatchRevert = false
         case .checkLauncherUpdate, .settingsQuickAction:
             break
@@ -232,7 +236,7 @@ struct SimulatedGameChannelClient: GameChannelClient {
 
     private func canUpdate(from version: String) -> Bool {
         if descriptor.gameType == "cbjq" {
-            SemanticVersion(version) <= SemanticVersion(descriptor.currentSupportedVersion)
+            true
         } else {
             descriptor.updatableVersions.contains(version)
         }

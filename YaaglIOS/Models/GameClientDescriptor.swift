@@ -77,6 +77,14 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
 }
 
 extension GameClientDescriptor {
+    var desktopManualIntegrityAvailable: Bool {
+        gameType != "nap"
+    }
+
+    var desktopManualIntegrityClearsPatchMarker: Bool {
+        ["hkrpg", "bh3", "cbjq"].contains(gameType)
+    }
+
     var desktopDefaultWorkaround3: Bool {
         gameType == "hk4e" && releaseType != "os"
     }

@@ -105,6 +105,9 @@ struct LauncherSimulationService: Sendable {
         installDirectory: String,
         state: ChannelClientState
     ) -> [SimulationStep] {
+        guard client.desktopManualIntegrityAvailable else {
+            return []
+        }
         let planningSteps = seasunIntegrityPlanningSteps(
             client: client,
             installDirectory: installDirectory,
@@ -120,7 +123,7 @@ struct LauncherSimulationService: Sendable {
                 "Blocked file repair download",
                 progress: 0.84,
                 log: "integrity: local files were not read or repaired",
-                virtualPatchState: false
+                virtualPatchState: client.desktopManualIntegrityClearsPatchMarker ? false : nil
             ),
             SimulationStep("Integrity simulation complete", progress: 1.0)
         ]
@@ -1336,7 +1339,7 @@ struct LauncherSimulationService: Sendable {
 
     private func canUpdate(client: GameClientDescriptor, from version: String) -> Bool {
         if client.gameType == "cbjq" {
-            SemanticVersion(version) <= SemanticVersion(client.currentSupportedVersion)
+            true
         } else {
             client.updatableVersions.contains(version)
         }

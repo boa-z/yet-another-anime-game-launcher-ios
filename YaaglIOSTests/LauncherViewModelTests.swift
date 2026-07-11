@@ -103,7 +103,7 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testCBJQManifestSupportedVersionUpdatesWithoutStaticPatchList() async throws {
+    func testCBJQUpdateAboveImportCeilingStillRunsManifestDiff() async throws {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
         let viewModel = makeViewModel(defaults: defaults)
@@ -111,7 +111,7 @@ final class LauncherViewModelTests: XCTestCase {
         viewModel.selectedClientID = cbjq.id
         viewModel.installState = .installed
         viewModel.installDirectory = "iOS Sandbox/VirtualGameData/cbjq_global"
-        viewModel.currentVersion = cbjq.currentSupportedVersion
+        viewModel.currentVersion = "2.0.1"
 
         XCTAssertTrue(viewModel.updateRequired)
         XCTAssertEqual(viewModel.primaryAction, .update)
@@ -1146,6 +1146,42 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.progress)
 
         await integrityTask.value
+    }
+
+    @MainActor
+    func testManualIntegrityOnlyClearsPatchMarkerForDesktopClientsThatDoSo() async throws {
+        for (clientID, shouldClear) in [
+            ("hk4e_cn", false),
+            ("nap_global", false),
+            ("hkrpg_global", true),
+            ("bh3_global", true),
+            ("cbjq_global", true)
+        ] {
+            let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+            let defaults = makeDefaults(suiteName: suiteName)
+            let store = ChannelClientStore(defaults: defaults)
+            let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == clientID })
+            store.save(
+                ChannelClientState(
+                    installState: .installed,
+                    installDirectory: "Imported/\(clientID)",
+                    currentVersion: client.latestVersion,
+                    predownloadedAll: false,
+                    requiresPatchRevert: true
+                ),
+                for: clientID
+            )
+            let viewModel = makeViewModel(defaults: defaults)
+            viewModel.selectedClientID = clientID
+
+            await viewModel.checkIntegrity()
+
+            XCTAssertEqual(
+                store.load(for: clientID).requiresPatchRevert,
+                !shouldClear,
+                "Unexpected patched marker state for \(clientID)"
+            )
+        }
     }
 
     @MainActor
