@@ -1013,11 +1013,59 @@ struct LauncherSimulationService: Sendable {
             ),
             SimulationStep("Update simulation complete", progress: 1.0)
         ]
+        let legacyAudioMigrationSteps = hk4eLegacyAudioMigrationSteps(client: client, state: state)
+        steps.insert(contentsOf: legacyAudioMigrationSteps, at: 1)
         steps.insert(
             contentsOf: seasunUpdatePlanningSteps(client: client, state: state),
-            at: 4
+            at: 4 + legacyAudioMigrationSteps.count
         )
         return steps
+    }
+
+    private func hk4eLegacyAudioMigrationSteps(
+        client: GameClientDescriptor,
+        state: ChannelClientState
+    ) -> [SimulationStep] {
+        guard client.gameType == "hk4e",
+              SemanticVersion(client.latestVersion) >= SemanticVersion("3.6.0")
+        else {
+            return []
+        }
+
+        let dataDirectory = joinedDesktopPath(
+            state.installDirectory,
+            client.dataDirectory
+        )
+        let source = joinedDesktopPath(
+            dataDirectory,
+            "StreamingAssets/Audio/GeneratedSoundBanks/Windows"
+        )
+        let destination = joinedDesktopPath(
+            dataDirectory,
+            "StreamingAssets/AudioAssets"
+        )
+        return [
+            SimulationStep(
+                "Planning legacy audio migration",
+                progress: 0.08,
+                log: "update: HK4E target \(client.latestVersion) is >= 3.6.0; desktop checks \(source), then if present creates \(destination), runs /bin/cp -R -f \(source)/. \(destination), and removes \(source); no files were read or changed on iOS"
+            )
+        ]
+    }
+
+    private func joinedDesktopPath(_ base: String, _ component: String) -> String {
+        var trimmedBase = base
+        while trimmedBase.hasSuffix("/") {
+            trimmedBase.removeLast()
+        }
+        let trimmedComponent = component.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !trimmedBase.isEmpty else {
+            return trimmedComponent
+        }
+        guard !trimmedComponent.isEmpty else {
+            return trimmedBase
+        }
+        return "\(trimmedBase)/\(trimmedComponent)"
     }
 
     private func updatePredownloadMarkerClearLog(for state: ChannelClientState) -> String {

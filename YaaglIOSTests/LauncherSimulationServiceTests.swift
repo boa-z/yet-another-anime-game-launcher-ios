@@ -229,6 +229,16 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let hkrpgLogs = hkrpgCommands.compactMap(\.log)
 
         XCTAssertTrue(hk4eLogs.contains("update: 5.2.0 -> 5.3.0"))
+        XCTAssertTrue(hk4eLogs.contains {
+            $0.contains("update: HK4E target 5.3.0 is >= 3.6.0") &&
+                $0.contains("iOS Sandbox/VirtualGameData/hk4e_cn/YuanShen_Data/StreamingAssets/Audio/GeneratedSoundBanks/Windows") &&
+                $0.contains("/bin/cp -R -f") &&
+                $0.contains("iOS Sandbox/VirtualGameData/hk4e_cn/YuanShen_Data/StreamingAssets/AudioAssets") &&
+                $0.contains("no files were read or changed on iOS")
+        })
+        let migrationIndex = try XCTUnwrap(hk4eLogs.firstIndex { $0.contains("HK4E target 5.3.0 is >= 3.6.0") })
+        let sophonIndex = try XCTUnwrap(hk4eLogs.firstIndex { $0.contains("Sophon startUpdate") })
+        XCTAssertLessThan(migrationIndex, sophonIndex)
         XCTAssertTrue(hk4eLogs.contains("update: Sophon startUpdate game_type=hk4e tempdir=.tmp predownload=false is simulated"))
         XCTAssertTrue(hk4eLogs.contains("sidecar: Sophon server metadata mirrors ./sidecar/sophon_server/sophon-server; HK4E install, HK4E update, HK4E pre-download, HK4E integrity repair are not bundled or executed on iOS"))
         XCTAssertTrue(hk4eLogs.contains("update: Sophon diff/chunk downloads and game package writes are disabled"))
@@ -246,6 +256,33 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(hkrpgLogs.contains("update: extract7z output, deletefiles.txt cleanup, and hdiffmap.json patch map are simulated"))
         XCTAssertTrue(hkrpgLogs.contains("update: config.ini [General] game_version=4.3.0 channel=1 sub_channel=1 cps=<HKRPG_OS_CPS> is simulated"))
         XCTAssertTrue(hkrpgLogs.contains("update: predownloaded_all and per-archive predownload markers would be cleared"))
+        XCTAssertFalse(hkrpgLogs.contains { $0.contains("legacy audio migration") })
+    }
+
+    @MainActor
+    func testHK4ELegacyAudioMigrationOnlyAppliesToTargetsAtLeastThreeSix() async throws {
+        let service = LauncherSimulationService(stepDurationMilliseconds: 0)
+        let hk4e = GameLibrary.defaultClients[0].applying(
+            runtimeMetadata: GameClientRuntimeMetadata(
+                latestVersion: "3.5.0",
+                updatableVersions: ["3.4.0"]
+            )
+        )
+        let directory = "iOS Sandbox/VirtualGameData/hk4e_cn"
+
+        let logs = try await logs(
+            service.makeProgram(
+                action: .update,
+                client: hk4e,
+                configuration: launchSnapshot(),
+                installDirectory: directory,
+                state: installedState(for: hk4e, at: directory, currentVersion: "3.4.0")
+            )
+        )
+
+        XCTAssertTrue(logs.contains("update: 3.4.0 -> 3.5.0"))
+        XCTAssertFalse(logs.contains { $0.contains("legacy audio migration") })
+        XCTAssertFalse(logs.contains { $0.contains("GeneratedSoundBanks/Windows") })
     }
 
     @MainActor

@@ -253,6 +253,9 @@ jobs:
         with:
           name: ${{ needs.build.outputs.archive_artifact }}
 
+      - name: Create stable nightly IPA alias
+        run: cp "${{ needs.build.outputs.ipa_artifact }}" YaaglIOS.ipa
+
       - name: Resolve release metadata
         id: release_metadata
         run: |
@@ -302,7 +305,7 @@ jobs:
 
             Built from ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}.
           files: |
-            ${{ needs.build.outputs.ipa_artifact }}
+            YaaglIOS.ipa
             ${{ needs.build.outputs.archive_artifact }}
 
   release_tag:
