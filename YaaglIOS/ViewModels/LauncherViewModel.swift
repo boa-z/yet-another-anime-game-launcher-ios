@@ -181,13 +181,33 @@ final class LauncherViewModel {
 
     func importExistingVirtualInstall(
         path: String,
-        probeResult: VirtualInstallProbeResult
+        probeResult: VirtualInstallProbeResult,
+        expectedClientID: String? = nil
     ) async {
         let installDirectory = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !installDirectory.isEmpty else {
             alertMessage = "Import path is empty"
             appendHistory(.importExisting, "Import skipped: empty virtual install path")
             return
+        }
+
+        guard expectedClientID == nil || expectedClientID == selectedClient.id else {
+            alertMessage = "Selected game changed; probe the install again"
+            appendHistory(.importExisting, "Import skipped: selected client changed after virtual install probe")
+            return
+        }
+
+        if case .existing(let version, let metadata, let manifestMetadata) = probeResult {
+            let metadataMatches = metadata == nil
+                || (metadata?.gameVersion == version && metadata?.sourceServerID == selectedClient.serverID)
+            let manifestMatches = manifestMetadata == nil
+                || (manifestMetadata?.projectVersion == version
+                    && manifestMetadata?.sourceServerID == selectedClient.serverID)
+            guard metadataMatches && manifestMatches else {
+                alertMessage = "Import metadata does not match the selected game"
+                appendHistory(.importExisting, "Import skipped: probe metadata does not match version or server")
+                return
+            }
         }
 
         switch probeResult {

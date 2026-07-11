@@ -2,20 +2,15 @@ import SwiftUI
 
 struct VirtualImportSettingsView: View {
     @Environment(LauncherViewModel.self) private var viewModel
-    @State private var importPath = ""
-    @State private var detectedVersion = ""
-    @State private var probeSnippet = ""
-    @State private var probeStatus = ""
-    @State private var detectedMetadata: VirtualInstallMetadata?
-    @State private var detectedManifestMetadata: VirtualInstallManifestMetadata?
+    @State private var form = VirtualImportFormState()
 
     var body: some View {
         Section("Virtual Import") {
-            TextField("Install Directory", text: $importPath)
+            TextField("Install Directory", text: $form.importPath)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
 
-            TextField("Version Probe Snippet", text: $probeSnippet, axis: .vertical)
+            TextField("Version Probe Snippet", text: $form.probeSnippet, axis: .vertical)
                 .lineLimit(4...8)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -23,13 +18,13 @@ struct VirtualImportSettingsView: View {
             Button("Parse Snippet", systemImage: "doc.text.magnifyingglass", action: parseProbeSnippet)
                 .disabled(!canParseSnippet)
 
-            if !probeStatus.isEmpty {
-                Text(probeStatus)
+            if !form.probeStatus.isEmpty {
+                Text(form.probeStatus)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
-            TextField("Detected Version", text: $detectedVersion)
+            TextField("Detected Version", text: $form.detectedVersion)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
 
@@ -37,88 +32,60 @@ struct VirtualImportSettingsView: View {
                 .disabled(!canImportExisting)
 
             Button("Use New Target", systemImage: "square.and.arrow.down", action: useNewTarget)
-                .disabled(!hasImportPath || viewModel.isBusy)
+                .disabled(!form.hasImportPath || viewModel.isBusy)
         }
         .onAppear(perform: fillDefaults)
         .onChange(of: viewModel.selectedClientID) {
             fillDefaults()
         }
-    }
-
-    private var hasImportPath: Bool {
-        !importPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        .onChange(of: form.importPath) {
+            form.reconcileEvidence(client: viewModel.selectedClient)
+        }
+        .onChange(of: form.detectedVersion) {
+            form.reconcileEvidence(client: viewModel.selectedClient)
+        }
+        .onChange(of: form.probeSnippet) {
+            form.reconcileEvidence(client: viewModel.selectedClient)
+        }
     }
 
     private var canImportExisting: Bool {
-        hasImportPath
-            && !detectedVersion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !viewModel.isBusy
+        form.canImportExisting(client: viewModel.selectedClient, isBusy: viewModel.isBusy)
     }
 
     private var canParseSnippet: Bool {
-        !probeSnippet.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !viewModel.isBusy
-    }
-
-    private var metadataForImport: VirtualInstallMetadata? {
-        let version = detectedVersion.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard detectedMetadata?.gameVersion == version else {
-            return nil
-        }
-        return detectedMetadata
-    }
-
-    private var manifestMetadataForImport: VirtualInstallManifestMetadata? {
-        let version = detectedVersion.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard detectedManifestMetadata?.projectVersion == version else {
-            return nil
-        }
-        return detectedManifestMetadata
+        form.canParseSnippet(isBusy: viewModel.isBusy)
     }
 
     private func fillDefaults() {
-        importPath = "iOS Sandbox/Imported/\(viewModel.selectedClient.id)"
-        detectedVersion = viewModel.selectedClient.latestVersion
-        probeSnippet = ""
-        probeStatus = ""
-        detectedMetadata = nil
-        detectedManifestMetadata = nil
+        form.reset(for: viewModel.selectedClient)
     }
 
     private func parseProbeSnippet() {
         let parsedSnippet = VirtualInstallSnippetParser().parse(
-            probeSnippet,
+            form.probeSnippet,
             for: viewModel.selectedClient
         )
-        probeStatus = parsedSnippet.message
-
-        if case .existing(let version, let metadata, let manifestMetadata) = parsedSnippet.probeResult {
-            detectedVersion = version
-            detectedMetadata = metadata
-            detectedManifestMetadata = manifestMetadata
-        } else {
-            detectedMetadata = nil
-            detectedManifestMetadata = nil
-        }
+        form.apply(parsedSnippet, client: viewModel.selectedClient)
     }
 
     private func importExisting() {
-        let version = detectedVersion.trimmingCharacters(in: .whitespacesAndNewlines)
-        let metadata = metadataForImport
-        let manifestMetadata = manifestMetadataForImport
+        let client = viewModel.selectedClient
+        guard let probeResult = form.validatedProbeResult(client: client) else {
+            return
+        }
+        let importPath = form.importPath
         Task {
             await viewModel.importExistingVirtualInstall(
                 path: importPath,
-                probeResult: .existing(
-                    version: version,
-                    metadata: metadata,
-                    manifestMetadata: manifestMetadata
-                )
+                probeResult: probeResult,
+                expectedClientID: client.id
             )
         }
     }
 
     private func useNewTarget() {
+        let importPath = form.importPath
         Task {
             await viewModel.importExistingVirtualInstall(
                 path: importPath,

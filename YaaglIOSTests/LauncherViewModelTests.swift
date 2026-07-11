@@ -381,6 +381,53 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testImportExistingRejectsMismatchedProbeMetadata() async {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let viewModel = makeViewModel(defaults: defaults)
+        let metadata = VirtualInstallMetadata(
+            gameVersion: "5.1.0",
+            channelID: 9,
+            subchannelID: 8,
+            cpsReference: "PASTED_CPS",
+            sourceServerID: "another_server"
+        )
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/Mismatched",
+            probeResult: .existing(version: "5.2.0", metadata: metadata)
+        )
+
+        XCTAssertEqual(viewModel.installState, .notInstalled)
+        XCTAssertEqual(viewModel.installDirectory, "")
+        XCTAssertEqual(viewModel.alertMessage, "Import metadata does not match the selected game")
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "Import skipped: probe metadata does not match version or server"
+        })
+    }
+
+    @MainActor
+    func testImportExistingRejectsClientChangedAfterProbe() async throws {
+        let viewModel = makeViewModel()
+        let originalClientID = viewModel.selectedClient.id
+        let otherClient = try XCTUnwrap(viewModel.clients.first { $0.id == "hk4e_global" })
+        viewModel.selectedClientID = otherClient.id
+
+        await viewModel.importExistingVirtualInstall(
+            path: "Imported/OldSelection",
+            probeResult: .existing(version: otherClient.latestVersion),
+            expectedClientID: originalClientID
+        )
+
+        XCTAssertEqual(viewModel.installState, .notInstalled)
+        XCTAssertEqual(viewModel.installDirectory, "")
+        XCTAssertEqual(viewModel.alertMessage, "Selected game changed; probe the install again")
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "Import skipped: selected client changed after virtual install probe"
+        })
+    }
+
+    @MainActor
     func testImportExistingPersistsParsedCBJQManifestMetadata() async throws {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
