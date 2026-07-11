@@ -436,6 +436,7 @@ struct LauncherSimulationService: Sendable {
         let capabilities = client.gameSettingsCapabilities
         let wineDistribution = WineDistribution.distribution(id: configuration.wineDistro)
         let wineDistroLabel = wineDistribution.map { "\($0.displayName) (\($0.id))" } ?? configuration.wineDistro
+        let wineRuntimePlan = WineRuntimePlan(distribution: wineDistribution)
         let translationRuntime = BinaryTranslationRuntime.box64Reference
         var steps = [
             SimulationStep(
@@ -453,6 +454,11 @@ struct LauncherSimulationService: Sendable {
                 "Applying Wine configuration",
                 progress: 0.2,
                 log: "launch: Wine distro \(wineDistroLabel) is simulated only"
+            ),
+            SimulationStep(
+                "Planning Wine loader",
+                progress: 0.2,
+                log: wineRuntimePlan.loaderSelectionLog
             ),
             SimulationStep(
                 "Planning architecture translation",
@@ -575,7 +581,12 @@ struct LauncherSimulationService: Sendable {
         steps.append(SimulationStep(
             "Previewing sanitized launch command",
             progress: 0.68,
-            log: launchCommandPreviewLog(client: client, configuration: configuration, capabilities: capabilities)
+            log: launchCommandPreviewLog(
+                client: client,
+                configuration: configuration,
+                capabilities: capabilities,
+                runtimePlan: wineRuntimePlan
+            )
         ))
 
         steps.append(SimulationStep("Game is running (simulation)", progress: 0.78, log: "launch: \(client.executable) was not executed"))
@@ -802,25 +813,24 @@ struct LauncherSimulationService: Sendable {
     private func launchCommandPreviewLog(
         client: GameClientDescriptor,
         configuration: LauncherConfigurationSnapshot,
-        capabilities: GameSettingsCapabilities
+        capabilities: GameSettingsCapabilities,
+        runtimePlan: WineRuntimePlan
     ) -> String {
-        let wineBinary = "./wine/bin/wine64"
+        let arguments: [String]
+        let executableSuffix: String
         if capabilities.steamPatch && configuration.steamPatch {
-            let command = DesktopCommandBuilder.build([
-                wineBinary,
+            arguments = [
                 "C:\\windows\\system32\\steam.exe",
                 client.executable
-            ])
-            return "launch command preview: \(command) (not executed)"
+            ]
+            executableSuffix = ""
+        } else {
+            arguments = ["cmd", "/c", "config.bat"]
+            executableSuffix = " for \(client.executable)"
         }
 
-        let command = DesktopCommandBuilder.build([
-            wineBinary,
-            "cmd",
-            "/c",
-            "config.bat"
-        ])
-        return "launch command preview: \(command) for \(client.executable) (not executed)"
+        let candidates = runtimePlan.commandCandidates(arguments: arguments).joined(separator: " OR ")
+        return "launch command preview candidates: \(candidates)\(executableSuffix); desktop uses the first existing loader (not probed or executed on iOS)"
     }
 
     private func launchRevertPlanSteps(
@@ -1244,6 +1254,14 @@ struct LauncherSimulationService: Sendable {
                 )
             ])
 
+            steps.append(
+                SimulationStep(
+                    "Planning Wine archive layout",
+                    progress: 0.44,
+                    log: pendingWineUpdate.runtimePlan.extractionLog
+                )
+            )
+
             if requiresMediaFoundation(for: client),
                let mediaFoundation = DependencyResource.resource(id: "media-foundation") {
                 steps.append(SimulationStep(
@@ -1291,7 +1309,9 @@ struct LauncherSimulationService: Sendable {
         return steps
     }
 
-    private func wineUpdatePlan(for configuration: LauncherConfigurationSnapshot) -> (label: String, remoteURL: String)? {
+    private func wineUpdatePlan(
+        for configuration: LauncherConfigurationSnapshot
+    ) -> (label: String, remoteURL: String, runtimePlan: WineRuntimePlan)? {
         guard configuration.wineState == .update else {
             return nil
         }
@@ -1299,10 +1319,18 @@ struct LauncherSimulationService: Sendable {
         let pendingID = configuration.wineUpdateTag.isEmpty ? configuration.wineDistro : configuration.wineUpdateTag
         if let distribution = WineDistribution.distribution(id: pendingID) {
             let remoteURL = configuration.wineUpdateURL.isEmpty ? distribution.remoteURL : configuration.wineUpdateURL
-            return ("\(distribution.displayName) (\(distribution.id))", remoteURL)
+            return (
+                "\(distribution.displayName) (\(distribution.id))",
+                remoteURL,
+                WineRuntimePlan(distribution: distribution)
+            )
         } else {
             let remoteURL = configuration.wineUpdateURL.isEmpty ? "unknown remote archive" : configuration.wineUpdateURL
-            return ("unknown Wine distribution \(pendingID)", remoteURL)
+            return (
+                "unknown Wine distribution \(pendingID)",
+                remoteURL,
+                WineRuntimePlan(distribution: nil)
+            )
         }
     }
 

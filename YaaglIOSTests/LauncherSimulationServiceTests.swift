@@ -82,7 +82,8 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch env preview: WINE_ENABLE_TIMEOUT_FIX=1"))
         XCTAssertTrue(logs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 dispatchcnglobal.yuanshen.com for 10s"))
         XCTAssertTrue(logs.contains("launch: would execute C:\\windows\\system32\\steam.exe with YuanShen.exe"))
-        XCTAssertTrue(logs.contains("launch command preview: ./wine/bin/wine64 C:\\\\windows\\\\system32\\\\steam.exe YuanShen.exe (not executed)"))
+        XCTAssertTrue(logs.contains("launch: desktop Wine loader candidates ./wine/bin/wine64 -> ./wine/bin/wine; desktop probes wine64 first and falls back to wine for newer WoW64 layouts; candidates are x86_64 targets for the Box64-style reference plan; no loader was probed on iOS"))
+        XCTAssertTrue(logs.contains("launch command preview candidates: ./wine/bin/wine64 C:\\\\windows\\\\system32\\\\steam.exe YuanShen.exe OR ./wine/bin/wine C:\\\\windows\\\\system32\\\\steam.exe YuanShen.exe; desktop uses the first existing loader (not probed or executed on iOS)"))
         let reshadeBlockLog = "dependency: ReShade 5.8.0 metadata mirrors installed_reshade; " +
             "ReShade_Setup_5.8.0_Addon.exe, install.exe, install.zip, d3dcompiler_47.dll, ReShade64.dll, dxgi.dll, ReShade.ini were not downloaded, extracted, copied, or written"
         XCTAssertTrue(logs.contains(reshadeBlockLog))
@@ -468,7 +469,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(batchLogs.contains("launch: WINEMSYNC=1; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(batchLogs.contains("launch: hosts edit disabled on iOS; desktop would add 0.0.0.0 globaldp-prod-os01.zenlesszonezero.com for 20s"))
         XCTAssertTrue(batchLogs.contains("launch: would execute cmd /c config.bat for ZenlessZoneZero.exe"))
-        XCTAssertTrue(batchLogs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for ZenlessZoneZero.exe (not executed)"))
+        XCTAssertTrue(batchLogs.contains("launch command preview candidates: ./wine/bin/wine64 cmd /c config.bat OR ./wine/bin/wine cmd /c config.bat for ZenlessZoneZero.exe; desktop uses the first existing loader (not probed or executed on iOS)"))
         XCTAssertTrue(batchLogs.contains("launch: NAP Screenmanager registry cleanup is simulated"))
         XCTAssertTrue(batchLogs.contains("launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal, nvngx, and protonextras copies are not reverted by desktop patchRevertProgram (not restored on iOS)"))
         XCTAssertFalse(batchLogs.contains { $0.contains("Steam path bypasses resolution args") })
@@ -492,7 +493,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
 
         XCTAssertTrue(steamLogs.contains("launch: NAP Steam path bypasses resolution args -screen-width 1280 -screen-height 720 -screen-fullscreen 0"))
         XCTAssertTrue(steamLogs.contains("launch: would execute C:\\windows\\system32\\steam.exe with ZenlessZoneZero.exe"))
-        XCTAssertTrue(steamLogs.contains("launch command preview: ./wine/bin/wine64 C:\\\\windows\\\\system32\\\\steam.exe ZenlessZoneZero.exe (not executed)"))
+        XCTAssertTrue(steamLogs.contains("launch command preview candidates: ./wine/bin/wine64 C:\\\\windows\\\\system32\\\\steam.exe ZenlessZoneZero.exe OR ./wine/bin/wine C:\\\\windows\\\\system32\\\\steam.exe ZenlessZoneZero.exe; desktop uses the first existing loader (not probed or executed on iOS)"))
         XCTAssertFalse(steamLogs.contains("launch: NAP args -screen-width 1280 -screen-height 720 -screen-fullscreen 0"))
     }
 
@@ -533,7 +534,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch: HTTP_PROXY=127.0.0.1:8080; HTTPS_PROXY=127.0.0.1:8080"))
         XCTAssertTrue(logs.contains("launch env preview: HTTP_PROXY=127.0.0.1:8080 HTTPS_PROXY=127.0.0.1:8080"))
         XCTAssertTrue(logs.contains("launch: would execute cmd /c config.bat for StarRail.exe"))
-        XCTAssertTrue(logs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for StarRail.exe (not executed)"))
+        XCTAssertTrue(logs.contains("launch command preview candidates: ./wine/bin/wine64 cmd /c config.bat OR ./wine/bin/wine cmd /c config.bat for StarRail.exe; desktop uses the first existing loader (not probed or executed on iOS)"))
         XCTAssertTrue(logs.contains("launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal and nvngx copies are not reverted by desktop patchRevertProgram (not restored on iOS)"))
         XCTAssertFalse(logs.contains { $0.contains("protonextras") })
         XCTAssertFalse(logs.contains { $0.contains("steam.exe") })
@@ -749,7 +750,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(launchLogs.contains("launch: MVK_ALLOW_METAL_FENCES=1"))
         XCTAssertTrue(launchLogs.contains("launch: WINEDLLOVERRIDES=d3d11,dxgi=n,b"))
         XCTAssertTrue(launchLogs.contains("launch: would execute cmd /c config.bat for Game/Binaries/Win64/Game.exe"))
-        XCTAssertTrue(launchLogs.contains("launch command preview: ./wine/bin/wine64 cmd /c config.bat for Game/Binaries/Win64/Game.exe (not executed)"))
+        XCTAssertTrue(launchLogs.contains("launch command preview candidates: ./wine/bin/wine64 cmd /c config.bat OR ./wine/bin/wine cmd /c config.bat for Game/Binaries/Win64/Game.exe; desktop uses the first existing loader (not probed or executed on iOS)"))
         XCTAssertTrue(launchLogs.contains("launch: desktop CBJQ DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in Wine prefix system32 only (not restored on iOS)"))
         XCTAssertTrue(launchLogs.contains("launch: desktop ReShade revert plan removes game dir dxgi.dll and d3dcompiler_47.dll (not removed on iOS)"))
 

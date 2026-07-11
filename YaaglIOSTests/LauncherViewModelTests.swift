@@ -817,6 +817,9 @@ final class LauncherViewModelTests: XCTestCase {
             $0.message == "wine update: remote archive https://github.com/yaagl/anime-game-wine/releases/download/wine-11.8-signed/wine-devel-11.8-osx64-signed.tar.xz was not requested"
         })
         XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "wine update: archive subpath wine would be extracted into normalized runtime root ./wine; archive extraction and path writes are disabled on iOS"
+        })
+        XCTAssertTrue(viewModel.taskHistory.contains {
             $0.message == "wine update: wine_state will be marked ready after simulation"
         })
     }
