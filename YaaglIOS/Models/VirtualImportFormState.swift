@@ -36,6 +36,7 @@ struct VirtualImportFormState: Equatable, Sendable {
 
         guard case .existing(let version, let metadata, let manifestMetadata) = parsedSnippet.probeResult,
               let source = parsedSnippet.source,
+              source.supportsExistingImport(for: client),
               metadata?.gameVersion == nil || metadata?.gameVersion == version,
               metadata?.sourceServerID == nil || metadata?.sourceServerID == client.serverID,
               manifestMetadata?.projectVersion == nil || manifestMetadata?.projectVersion == version,

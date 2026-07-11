@@ -17,20 +17,34 @@ final class VirtualImportFormStateTests: XCTestCase {
         XCTAssertNil(state.existingImportRequest(client: client))
     }
 
-    func testSuccessfulSnippetBindsImportEvidenceAndMetadata() throws {
+    func testSuccessfulDesktopProbeBindsImportEvidenceAndMetadata() throws {
         let client = try hk4eClient()
+        let contract = try XCTUnwrap(client.virtualInstallDesktopProbeContract)
         var state = VirtualImportFormState()
         state.reset(for: client)
         state.importPath = "/virtual/Genshin Impact"
         state.probeSnippet = """
-        [General]
-        game_version=5.3.0
-        channel=9
-        sub_channel=2
-        cps=<CUSTOM_CPS>
+        {
+          "desktopProbe": {
+            "installPath": "\(state.importPath)",
+            "clientID": "\(client.id)",
+            "serverID": "\(client.serverID)",
+            "markerPath": "\(contract.markerPath)",
+            "markerPresent": true,
+            "versionPath": "\(contract.versionPath)",
+            "versionReadable": true,
+            "auxiliaryPaths": \(jsonArray(contract.auxiliaryPaths)),
+            "auxiliaryReadable": true,
+            "versionStrategy": "\(contract.versionStrategy)",
+            "version": "5.3.0"
+          }
+        }
         """
 
-        state.apply(parser.parse(state.probeSnippet, for: client), client: client)
+        state.apply(
+            parser.parse(state.probeSnippet, for: client, installPath: state.importPath),
+            client: client
+        )
 
         XCTAssertEqual(state.detectedVersion, "5.3.0")
         XCTAssertTrue(state.canImportExisting(client: client, isBusy: false))
@@ -38,29 +52,37 @@ final class VirtualImportFormStateTests: XCTestCase {
             return XCTFail("Expected validated existing-install evidence")
         }
         XCTAssertEqual(version, "5.3.0")
-        XCTAssertEqual(metadata?.channelID, 9)
-        XCTAssertEqual(metadata?.subchannelID, 2)
-        XCTAssertEqual(metadata?.cpsReference, "CUSTOM_CPS")
+        XCTAssertEqual(metadata, VirtualInstallMetadata(client: client, gameVersion: "5.3.0"))
     }
 
     func testSuccessfulHKRPGSnippetEnablesExistingImport() throws {
         let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hkrpg_global" })
+        let contract = try XCTUnwrap(client.virtualInstallDesktopProbeContract)
         var state = VirtualImportFormState()
         state.reset(for: client)
         state.importPath = "/virtual/Star Rail"
         state.probeSnippet = """
         {
-          "data": {
-            "game": {
-              "latest": {
-                "version": "4.3.0"
-              }
-            }
+          "desktopProbe": {
+            "installPath": "\(state.importPath)",
+            "clientID": "\(client.id)",
+            "serverID": "\(client.serverID)",
+            "markerPath": "\(contract.markerPath)",
+            "markerPresent": true,
+            "versionPath": "\(contract.versionPath)",
+            "versionReadable": true,
+            "auxiliaryPaths": \(jsonArray(contract.auxiliaryPaths)),
+            "auxiliaryReadable": true,
+            "versionStrategy": "\(contract.versionStrategy)",
+            "version": "4.3.0"
           }
         }
         """
 
-        state.apply(parser.parse(state.probeSnippet, for: client), client: client)
+        state.apply(
+            parser.parse(state.probeSnippet, for: client, installPath: state.importPath),
+            client: client
+        )
 
         XCTAssertEqual(state.detectedVersion, "4.3.0")
         XCTAssertTrue(state.canImportExisting(client: client, isBusy: false))
@@ -140,17 +162,54 @@ final class VirtualImportFormStateTests: XCTestCase {
         XCTAssertNil(state.existingImportRequest(client: client))
     }
 
-    private func probedState(for client: GameClientDescriptor) -> VirtualImportFormState {
+    func testGenericMetadataSnippetCannotBecomeExistingInstallEvidence() throws {
+        let client = try hk4eClient()
         var state = VirtualImportFormState()
         state.reset(for: client)
         state.importPath = "/virtual/Genshin Impact"
         state.probeSnippet = "[General]\ngame_version=5.3.0"
+
         state.apply(parser.parse(state.probeSnippet, for: client), client: client)
+
+        XCTAssertNil(state.existingImportRequest(client: client))
+    }
+
+    private func probedState(for client: GameClientDescriptor) -> VirtualImportFormState {
+        let contract = client.virtualInstallDesktopProbeContract!
+        var state = VirtualImportFormState()
+        state.reset(for: client)
+        state.importPath = "/virtual/Genshin Impact"
+        state.probeSnippet = """
+        {
+          "desktopProbe": {
+            "installPath": "\(state.importPath)",
+            "clientID": "\(client.id)",
+            "serverID": "\(client.serverID)",
+            "markerPath": "\(contract.markerPath)",
+            "markerPresent": true,
+            "versionPath": "\(contract.versionPath)",
+            "versionReadable": true,
+            "auxiliaryPaths": \(jsonArray(contract.auxiliaryPaths)),
+            "auxiliaryReadable": true,
+            "versionStrategy": "\(contract.versionStrategy)",
+            "version": "5.3.0"
+          }
+        }
+        """
+        state.apply(
+            parser.parse(state.probeSnippet, for: client, installPath: state.importPath),
+            client: client
+        )
         return state
     }
 
     private func hk4eClient() throws -> GameClientDescriptor {
         try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hk4e_cn" })
+    }
+
+    private func jsonArray(_ values: [String]) -> String {
+        let data = try! JSONSerialization.data(withJSONObject: values)
+        return String(decoding: data, as: UTF8.self)
     }
 }
 

@@ -195,6 +195,12 @@ final class LauncherViewModel {
             return
         }
 
+        guard request.source.supportsExistingImport(for: selectedClient) else {
+            alertMessage = "Probe source does not match the selected game"
+            appendHistory(.importExisting, "Import skipped: probe source does not match desktop client logic")
+            return
+        }
+
         guard case .existing(let version, let metadata, let manifestMetadata) = request.probeResult else {
             alertMessage = "Import probe did not identify an existing game"
             appendHistory(.importExisting, "Import skipped: probe evidence is not an existing install")

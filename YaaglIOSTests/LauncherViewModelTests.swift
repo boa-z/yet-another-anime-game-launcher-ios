@@ -407,6 +407,29 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testImportExistingRejectsSourceOutsideDesktopProbeContract() async {
+        let viewModel = makeViewModel()
+        let client = viewModel.selectedClient
+
+        await viewModel.importExistingVirtualInstall(
+            VirtualInstallImportRequest(
+                path: "Imported/ForgedSource",
+                clientID: client.id,
+                serverID: client.serverID,
+                source: .configINI,
+                probeResult: .existing(version: client.latestVersion)
+            )
+        )
+
+        XCTAssertEqual(viewModel.installState, .notInstalled)
+        XCTAssertEqual(viewModel.installDirectory, "")
+        XCTAssertEqual(viewModel.alertMessage, "Probe source does not match the selected game")
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "Import skipped: probe source does not match desktop client logic"
+        })
+    }
+
+    @MainActor
     func testImportExistingRejectsClientChangedAfterProbe() async throws {
         let viewModel = makeViewModel()
         let originalClientID = viewModel.selectedClient.id
@@ -1208,11 +1231,20 @@ private extension LauncherViewModel {
             return
         }
 
-        let source: VirtualInstallSnippetSource
-        if case .existing(_, _, let manifestMetadata) = probeResult, manifestMetadata != nil {
-            source = .manifestJSON
+        let source = selectedClient.virtualInstallDesktopProbeContract?.source ?? .manifestJSON
+        let normalizedProbeResult: VirtualInstallProbeResult
+        if selectedClient.gameType == "cbjq",
+           case .existing(let version, _, let manifestMetadata) = probeResult,
+           manifestMetadata == nil {
+            normalizedProbeResult = .existing(
+                version: version,
+                manifestMetadata: VirtualInstallManifestMetadata(
+                    client: selectedClient,
+                    projectVersion: version
+                )
+            )
         } else {
-            source = .configINI
+            normalizedProbeResult = probeResult
         }
         await importExistingVirtualInstall(
             VirtualInstallImportRequest(
@@ -1220,7 +1252,7 @@ private extension LauncherViewModel {
                 clientID: expectedClientID ?? selectedClient.id,
                 serverID: selectedClient.serverID,
                 source: source,
-                probeResult: probeResult
+                probeResult: normalizedProbeResult
             )
         )
     }

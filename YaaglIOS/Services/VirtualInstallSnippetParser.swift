@@ -7,7 +7,8 @@ struct VirtualInstallSnippetParser: Sendable {
 
     func parse(
         _ snippet: String,
-        for client: GameClientDescriptor
+        for client: GameClientDescriptor,
+        installPath: String? = nil
     ) -> VirtualInstallSnippetProbeResult {
         let trimmedSnippet = snippet.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedSnippet.isEmpty else {
@@ -16,6 +17,11 @@ struct VirtualInstallSnippetParser: Sendable {
 
         guard trimmedSnippet.utf8.count <= Self.maximumSnippetBytes else {
             return unreadable("Snippet is over 64 KB")
+        }
+
+        if let object = jsonObject(from: trimmedSnippet) as? [String: Any],
+           object["desktopProbe"] != nil {
+            return parseDesktopProbeReport(object, for: client, installPath: installPath)
         }
 
         if looksLikeConfigINI(trimmedSnippet) {
@@ -31,6 +37,75 @@ struct VirtualInstallSnippetParser: Sendable {
         }
 
         return unreadable("No supported game version metadata found")
+    }
+
+    private func parseDesktopProbeReport(
+        _ object: [String: Any],
+        for client: GameClientDescriptor,
+        installPath: String?
+    ) -> VirtualInstallSnippetProbeResult {
+        guard let contract = client.virtualInstallDesktopProbeContract else {
+            return unreadable("This client requires its local manifest instead of a desktop probe report")
+        }
+        guard let report = object["desktopProbe"] as? [String: Any] else {
+            return unreadable("desktopProbe must be a JSON object", source: contract.source)
+        }
+
+        guard let normalizedInstallPath = installPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !normalizedInstallPath.isEmpty,
+              plainStringValue(from: report["installPath"]) == normalizedInstallPath,
+              plainStringValue(from: report["clientID"]) == client.id,
+              plainStringValue(from: report["serverID"]) == client.serverID
+        else {
+            return unreadable("Desktop probe identity does not match path or selected client", source: contract.source)
+        }
+
+        guard boolValue(from: report["markerPresent"]) == true else {
+            return unreadable("Desktop marker \(contract.markerPath) is missing", source: contract.source)
+        }
+        guard plainStringValue(from: report["markerPath"]) == contract.markerPath else {
+            return unreadable("Desktop marker path does not match \(contract.markerPath)", source: contract.source)
+        }
+        guard boolValue(from: report["versionReadable"]) == true else {
+            return unreadable("Desktop version source \(contract.versionPath) is unreadable", source: contract.source)
+        }
+        guard plainStringValue(from: report["versionPath"]) == contract.versionPath else {
+            return unreadable("Desktop version path does not match \(contract.versionPath)", source: contract.source)
+        }
+        guard stringArray(from: report["auxiliaryPaths"]) == contract.auxiliaryPaths else {
+            return unreadable("Desktop auxiliary paths do not match client version logic", source: contract.source)
+        }
+        guard boolValue(from: report["auxiliaryReadable"]) == true else {
+            return unreadable("A desktop auxiliary version source is unreadable", source: contract.source)
+        }
+        guard plainStringValue(from: report["versionStrategy"]) == contract.versionStrategy else {
+            return unreadable("Desktop version strategy does not match \(contract.versionStrategy)", source: contract.source)
+        }
+        let version: String
+        if client.gameType == "nap" {
+            guard let rawUnityVersion = plainStringValue(from: report["unityVersion"]),
+                  let unityVersion = normalizedVersion(rawUnityVersion),
+                  let resourcesAssetsMD5 = normalizedMD5(report["resourcesAssetsMD5"])
+            else {
+                return unreadable("NAP probe requires a Unity version and resources.assets MD5", source: contract.source)
+            }
+            version = resourcesAssetsMD5 == "9210cde58b1d5df1a3224c3786139e01"
+                ? "1.0.1"
+                : unityVersion
+        } else {
+            guard let rawVersion = plainStringValue(from: report["version"]),
+                  let parsedVersion = normalizedVersion(rawVersion)
+            else {
+                return unreadable("Desktop probe report has no valid game version", source: contract.source)
+            }
+            version = parsedVersion
+        }
+
+        return detected(
+            version,
+            metadata: synthesizedConfigMetadata(for: client, version: version),
+            source: contract.source
+        )
     }
 
     private func parseConfigINI(
@@ -104,6 +179,22 @@ struct VirtualInstallSnippetParser: Sendable {
             return nil
         }
 
+        if client.gameType == "cbjq" {
+            guard let rawVersion = stringValue(at: ["projectVersion"], in: object),
+                  let version = normalizedVersion(rawVersion)
+            else {
+                return unreadable(
+                    "Local Seasun manifest must contain a top-level projectVersion",
+                    source: .manifestJSON
+                )
+            }
+            return detected(
+                version,
+                manifestMetadata: seasunManifestMetadata(in: object, version: version, for: client),
+                source: .manifestJSON
+            )
+        }
+
         let versionKeyPaths = [
             ["projectVersion"],
             ["data", "game", "latest", "version"],
@@ -119,14 +210,6 @@ struct VirtualInstallSnippetParser: Sendable {
         for keyPath in versionKeyPaths {
             if let rawVersion = stringValue(at: keyPath, in: object),
                let version = normalizedVersion(rawVersion) {
-                if keyPath == ["projectVersion"], client.gameType == "cbjq" {
-                    return detected(
-                        version,
-                        manifestMetadata: seasunManifestMetadata(in: object, version: version, for: client),
-                        source: .manifestJSON
-                    )
-                }
-
                 return detected(
                     version,
                     metadata: synthesizedConfigMetadata(for: client, version: version),
@@ -224,22 +307,14 @@ struct VirtualInstallSnippetParser: Sendable {
         version: String,
         for client: GameClientDescriptor
     ) -> VirtualInstallManifestMetadata? {
-        let rawPaks = object["paks"] as? [[String: Any]]
-        let paks = rawPaks?.compactMap(seasunPakMetadata) ?? []
-        let manifestVersion = plainStringValue(from: object["version"])
-            ?? client.server.manifestVersion
-        let pathOffset = plainStringValue(from: object["pathOffset"])
-            ?? client.server.manifestPathOffset
-        let expectedPakCount = rawPaks?.count ?? client.server.manifestPakCount
-        let expectedPayloadBytes = rawPaks == nil
-            ? client.server.manifestPayloadBytes.map(Int64.init)
-            : paks.reduce(0) { $0 + $1.sizeInBytes }
-
-        guard let manifestVersion,
-              let pathOffset,
-              let expectedPakCount,
-              let expectedPayloadBytes
+        guard let rawPaks = object["paks"] as? [[String: Any]],
+              let manifestVersion = plainStringValue(from: object["version"]),
+              let pathOffset = plainStringValue(from: object["pathOffset"])
         else {
+            return nil
+        }
+        let paks = rawPaks.compactMap(seasunPakMetadata)
+        guard paks.count == rawPaks.count else {
             return nil
         }
 
@@ -250,8 +325,8 @@ struct VirtualInstallSnippetParser: Sendable {
             paks: paks,
             sourceServerID: client.serverID,
             channel: client.server.desktopServerChannel,
-            expectedPakCount: expectedPakCount,
-            expectedPayloadBytes: expectedPayloadBytes
+            expectedPakCount: paks.count,
+            expectedPayloadBytes: paks.reduce(0) { $0 + $1.sizeInBytes }
         )
     }
 
@@ -303,6 +378,19 @@ struct VirtualInstallSnippetParser: Sendable {
         return trimmedValue.isEmpty ? nil : trimmedValue
     }
 
+    private func normalizedMD5(_ rawValue: Any?) -> String? {
+        guard let value = plainStringValue(from: rawValue)?.lowercased(),
+              value.count == 32,
+              value.unicodeScalars.allSatisfy({ scalar in
+                  (scalar.value >= 48 && scalar.value <= 57)
+                      || (scalar.value >= 97 && scalar.value <= 102)
+              })
+        else {
+            return nil
+        }
+        return value
+    }
+
     private func integerValue(from rawValue: Any?) -> Int64? {
         if let intValue = rawValue as? Int {
             return Int64(intValue)
@@ -314,6 +402,14 @@ struct VirtualInstallSnippetParser: Sendable {
             return Int64(stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         return nil
+    }
+
+    private func stringArray(from rawValue: Any?) -> [String]? {
+        guard let values = rawValue as? [Any] else {
+            return nil
+        }
+        let strings = values.compactMap(plainStringValue)
+        return strings.count == values.count ? strings : nil
     }
 
     private func boolValue(from rawValue: Any?) -> Bool? {

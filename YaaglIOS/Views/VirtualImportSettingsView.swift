@@ -64,7 +64,8 @@ struct VirtualImportSettingsView: View {
     private func parseProbeSnippet() {
         let parsedSnippet = VirtualInstallSnippetParser().parse(
             form.probeSnippet,
-            for: viewModel.selectedClient
+            for: viewModel.selectedClient,
+            installPath: form.importPath
         )
         form.apply(parsedSnippet, client: viewModel.selectedClient)
     }
