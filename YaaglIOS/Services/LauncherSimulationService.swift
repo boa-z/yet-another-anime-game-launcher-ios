@@ -1326,7 +1326,10 @@ struct LauncherSimulationService: Sendable {
             return nil
         }
 
-        return "launch: \(client.gameType.uppercased()) version \(version) is above desktop supported \(client.currentSupportedVersion); desktop would show unsupported-version alert and skip launch unless patchOff is enabled"
+        let patchOffBehavior = client.gameSettingsCapabilities.patchOff
+            ? " unless patchOff is enabled"
+            : "; patchOff is unavailable for this desktop channel"
+        return "launch: \(client.gameType.uppercased()) version \(version) is above desktop supported \(client.currentSupportedVersion); desktop would show unsupported-version alert and skip launch\(patchOffBehavior)"
     }
 
     private func requiresMediaFoundation(for client: GameClientDescriptor) -> Bool {

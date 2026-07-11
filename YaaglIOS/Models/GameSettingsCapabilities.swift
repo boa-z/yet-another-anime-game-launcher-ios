@@ -40,7 +40,7 @@ struct GameSettingsCapabilities: Equatable, Sendable {
     )
 
     static let bh3 = GameSettingsCapabilities(
-        patchOff: true,
+        patchOff: false,
         workaround3: false,
         steamPatch: false,
         blockNet: false,

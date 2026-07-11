@@ -700,7 +700,7 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.alertMessage, "Unsupported game version 2.1.0")
         XCTAssertTrue(store.load(for: cbjq.id).requiresPatchRevert)
         XCTAssertTrue(viewModel.taskHistory.contains {
-            $0.message == "launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"
+            $0.message == "launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch; patchOff is unavailable for this desktop channel"
         })
         XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Launch skipped: unsupported version" })
         XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Launch simulation complete" })
@@ -721,7 +721,7 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testBH3UnsupportedLaunchIsBlockedUnlessPatchOffEnabled() async throws {
+    func testBH3UnsupportedLaunchCannotBeBypassedByResidualPatchOff() async throws {
         let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
         let defaults = makeDefaults(suiteName: suiteName)
         let bh3 = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
@@ -745,7 +745,7 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.alertMessage, "Unsupported game version 8.4.0")
         XCTAssertTrue(store.load(for: bh3.id).requiresPatchRevert)
         XCTAssertTrue(viewModel.taskHistory.contains {
-            $0.message == "launch: BH3 version 8.4.0 is above desktop supported 7.5.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"
+            $0.message == "launch: BH3 version 8.4.0 is above desktop supported 7.5.0; desktop would show unsupported-version alert and skip launch; patchOff is unavailable for this desktop channel"
         })
         XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Launch skipped: unsupported version" })
         XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Launch simulation complete" })
@@ -753,14 +753,15 @@ final class LauncherViewModelTests: XCTestCase {
         viewModel.configuration.patchOff = true
         await viewModel.runPrimaryAction()
 
-        XCTAssertEqual(viewModel.statusText, "Launch simulation complete")
-        XCTAssertEqual(viewModel.taskStatus, .completed(.launch))
-        let patchOffLaunchState = store.load(for: bh3.id)
-        XCTAssertFalse(
-            patchOffLaunchState.requiresPatchRevert,
-            "Stored state after patchOff launch: \(patchOffLaunchState)"
+        XCTAssertEqual(viewModel.statusText, "Unsupported game version 8.4.0")
+        XCTAssertEqual(viewModel.alertMessage, "Unsupported game version 8.4.0")
+        XCTAssertTrue(store.load(for: bh3.id).requiresPatchRevert)
+        XCTAssertEqual(
+            viewModel.taskHistory.filter { $0.message == "Launch skipped: unsupported version" }.count,
+            2
         )
-        XCTAssertTrue(viewModel.taskHistory.contains { $0.message == "Launch Game completed" })
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message == "Launch simulation complete" })
+        XCTAssertFalse(viewModel.taskHistory.contains { $0.message.contains("launch command preview") })
     }
 
     @MainActor

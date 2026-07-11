@@ -345,7 +345,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
     }
 
     @MainActor
-    func testBH3LaunchGuardAndPatchOffTraceMatchDesktop() async throws {
+    func testBH3LaunchGuardAndResidualPatchOffTraceMatchDesktop() async throws {
         let service = LauncherSimulationService(stepDurationMilliseconds: 0)
         let client = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "bh3_global" })
         let blockedCommands = try await collect(
@@ -353,7 +353,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
                 action: .launch,
                 client: client,
                 configuration: launchSnapshot(
-                    patchOff: false,
+                    patchOff: true,
                     wineDistro: "11.0-dxmt-signed-with-patches"
                 ),
                 installDirectory: "iOS Sandbox/VirtualGameData/bh3_global",
@@ -364,7 +364,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let blockedLogs = blockedCommands.compactMap(\.log)
 
         XCTAssertTrue(blockedStateTexts.contains("Unsupported game version 8.4.0"))
-        XCTAssertTrue(blockedLogs.contains("launch: BH3 version 8.4.0 is above desktop supported 7.5.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"))
+        XCTAssertTrue(blockedLogs.contains("launch: BH3 version 8.4.0 is above desktop supported 7.5.0; desktop would show unsupported-version alert and skip launch; patchOff is unavailable for this desktop channel"))
         XCTAssertFalse(blockedLogs.contains { $0.contains("dependency: Jadeite") })
         XCTAssertFalse(blockedLogs.contains { $0.contains("launch command preview") })
 
@@ -395,7 +395,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
                 state: ChannelClientState(
                     installState: .installed,
                     installDirectory: "iOS Sandbox/VirtualGameData/bh3_global",
-                    currentVersion: client.latestVersion,
+                    currentVersion: client.currentSupportedVersion,
                     predownloadedAll: false,
                     requiresPatchRevert: false
                 )
@@ -404,8 +404,9 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let stateTexts = commands.compactMap(\.stateText)
         let logs = commands.compactMap(\.log)
 
-        XCTAssertTrue(logs.contains("launch: game AC patch is disabled"))
-        XCTAssertTrue(logs.contains("launch: patchOff requested no game file patch"))
+        XCTAssertTrue(logs.contains("launch: full patch payload set is simulated"))
+        XCTAssertFalse(logs.contains("launch: game AC patch is disabled"))
+        XCTAssertFalse(logs.contains("launch: patchOff requested no game file patch"))
         XCTAssertTrue(logs.contains("dependency: Jadeite 4.1.0 metadata mirrors installed_jadeite_version; v4.1.0.zip were not downloaded"))
         XCTAssertTrue(logs.contains("dependency: DXMT 0.80.0 metadata mirrors installed_dxmt_version; dxmt-v0.80-builtin.tar.gz, d3d10core.dll, d3d11.dll, dxgi.dll, winemetal.dll, winemetal.so, nvngx.dll were not downloaded"))
         XCTAssertTrue(logs.contains {
@@ -422,8 +423,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         XCTAssertTrue(logs.contains("launch: WINEMSYNC=1; DXMT_LOG_PATH=./; DXMT_CONFIG=d3d11.preferredMaxFrameRate=60; DXMT_CONFIG_FILE=dxmt.conf; GST_PLUGIN_FEATURE_RANK=atdec:MAX,avdec_h264:MAX"))
         XCTAssertTrue(logs.contains("launch: desktop DXMT revert plan restores d3d10core.dll, d3d11.dll, dxgi.dll from .bak in ./wine/lib/wine/x86_64-windows; winemetal, nvngx, and protonextras copies are not reverted by desktop patchRevertProgram (not restored on iOS)"))
         XCTAssertTrue(logs.contains("launch: desktop ReShade revert plan removes game dir dxgi.dll and d3dcompiler_47.dll (not removed on iOS)"))
-        XCTAssertFalse(logs.contains("launch: desktop removed-file patch plan moves BH3_Data/Plugins/crashreport.exe, BH3_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
-        XCTAssertFalse(logs.contains("launch: full patch payload set is simulated"))
+        XCTAssertTrue(logs.contains("launch: desktop removed-file patch plan moves BH3_Data/Plugins/crashreport.exe, BH3_Data/Plugins/vulkan-1.dll to .bak and restores them after exit"))
         XCTAssertFalse(logs.contains("launch: workaround3 skips tagged patch payloads"))
         XCTAssertFalse(logs.contains("launch: WINE_ENABLE_TIMEOUT_FIX=1"))
         XCTAssertFalse(logs.contains("launch: would execute C:\\windows\\system32\\steam.exe with BH3.exe"))
@@ -689,7 +689,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let blockedLaunchLogs = blockedLaunchCommands.compactMap(\.log)
 
         XCTAssertTrue(blockedLaunchStateTexts.contains("Unsupported game version 2.1.0"))
-        XCTAssertTrue(blockedLaunchLogs.contains("launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"))
+        XCTAssertTrue(blockedLaunchLogs.contains("launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch; patchOff is unavailable for this desktop channel"))
         XCTAssertFalse(blockedLaunchStateTexts.contains("Game is running (simulation)"))
         XCTAssertFalse(blockedLaunchLogs.contains { $0.contains("dependency: Jadeite") })
         XCTAssertFalse(blockedLaunchLogs.contains { $0.contains("launch command preview") })
@@ -711,7 +711,7 @@ final class LauncherSimulationServiceTests: XCTestCase {
         let stalePatchOffLogs = stalePatchOffLaunchCommands.compactMap(\.log)
 
         XCTAssertTrue(stalePatchOffStateTexts.contains("Unsupported game version 2.1.0"))
-        XCTAssertTrue(stalePatchOffLogs.contains("launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch unless patchOff is enabled"))
+        XCTAssertTrue(stalePatchOffLogs.contains("launch: CBJQ version 2.1.0 is above desktop supported 2.0.0; desktop would show unsupported-version alert and skip launch; patchOff is unavailable for this desktop channel"))
         XCTAssertFalse(stalePatchOffStateTexts.contains("Game is running (simulation)"))
         XCTAssertFalse(stalePatchOffLogs.contains { $0.contains("dependency: Jadeite") })
         XCTAssertFalse(stalePatchOffLogs.contains { $0.contains("launch command preview") })

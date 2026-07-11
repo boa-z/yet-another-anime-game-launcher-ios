@@ -32,7 +32,7 @@ final class GameSettingsCapabilitiesTests: XCTestCase {
         XCTAssertFalse(GameSettingsCapabilities.hkrpg.steamPatch)
         XCTAssertFalse(GameSettingsCapabilities.hkrpg.resolution)
 
-        XCTAssertTrue(GameSettingsCapabilities.bh3.patchOff)
+        XCTAssertFalse(GameSettingsCapabilities.bh3.patchOff)
         XCTAssertFalse(GameSettingsCapabilities.bh3.steamPatch)
         XCTAssertFalse(GameSettingsCapabilities.bh3.blockNet)
         XCTAssertFalse(GameSettingsCapabilities.bh3.resolution)
