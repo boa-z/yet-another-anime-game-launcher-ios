@@ -17,6 +17,7 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
     let updatableVersions: [String]
     let predownloadVersion: String?
     let predownloadAvailable: Bool
+    let predownloadTargetAvailable: Bool
     let predownloadArchiveBasenames: [String]
     let seasunManifestMetadata: VirtualInstallManifestMetadata?
     let installSize: String
@@ -41,6 +42,7 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
         updatableVersions: [String],
         predownloadVersion: String?,
         predownloadAvailable: Bool,
+        predownloadTargetAvailable: Bool? = nil,
         predownloadArchiveBasenames: [String] = [],
         seasunManifestMetadata: VirtualInstallManifestMetadata? = nil,
         installSize: String,
@@ -64,6 +66,7 @@ struct GameClientDescriptor: Identifiable, Hashable, Sendable {
         self.updatableVersions = updatableVersions
         self.predownloadVersion = predownloadVersion
         self.predownloadAvailable = predownloadAvailable
+        self.predownloadTargetAvailable = predownloadTargetAvailable ?? predownloadAvailable
         self.predownloadArchiveBasenames = predownloadArchiveBasenames
         self.seasunManifestMetadata = seasunManifestMetadata
         self.installSize = installSize
@@ -97,6 +100,16 @@ extension GameClientDescriptor {
         let updatedPredownloadVersion = updatedPredownloadAvailable
             ? (metadata.predownloadVersion ?? predownloadVersion)
             : nil
+        let updatedPredownloadTargetAvailable: Bool
+        if !updatedPredownloadAvailable {
+            updatedPredownloadTargetAvailable = false
+        } else if let targetAvailable = metadata.predownloadTargetAvailable {
+            updatedPredownloadTargetAvailable = targetAvailable
+        } else if metadata.predownloadAvailable != nil {
+            updatedPredownloadTargetAvailable = true
+        } else {
+            updatedPredownloadTargetAvailable = predownloadTargetAvailable
+        }
         return GameClientDescriptor(
             id: id,
             title: title,
@@ -114,6 +127,7 @@ extension GameClientDescriptor {
             updatableVersions: metadata.updatableVersions ?? updatableVersions,
             predownloadVersion: updatedPredownloadVersion,
             predownloadAvailable: updatedPredownloadAvailable,
+            predownloadTargetAvailable: updatedPredownloadTargetAvailable,
             predownloadArchiveBasenames: metadata.predownloadArchiveBasenames ?? predownloadArchiveBasenames,
             seasunManifestMetadata: metadata.seasunManifestMetadata?.applying(client: self) ?? seasunManifestMetadata,
             installSize: metadata.installSize ?? installSize,

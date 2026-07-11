@@ -18,14 +18,12 @@ struct SimulatedGameChannelClient: GameChannelClient {
     }
 
     func showPredownloadPrompt(in state: ChannelClientState) -> Bool {
-        guard state.installState == .installed,
-              descriptor.predownloadAvailable,
-              let version = descriptor.predownloadVersion
-        else {
+        guard canPredownload(in: state),
+              let version = descriptor.predownloadVersion else {
             return false
         }
 
-        return !state.predownloadedAll && SemanticVersion(version) > SemanticVersion(state.currentVersion)
+        return SemanticVersion(version) > SemanticVersion(state.currentVersion)
     }
 
     func predownloadTitle(in state: ChannelClientState) -> String {
@@ -90,8 +88,10 @@ struct SimulatedGameChannelClient: GameChannelClient {
                 nextState = .empty
             }
         case .predownload:
-            nextState.predownloadedAll = true
-            nextState.predownloadedArchiveKeys = PredownloadArchiveMarker.markers(for: descriptor).map(\.key).sorted()
+            if canPredownload(in: currentState) {
+                nextState.predownloadedAll = true
+                nextState.predownloadedArchiveKeys = PredownloadArchiveMarker.markers(for: descriptor).map(\.key).sorted()
+            }
         case .launch:
             guard !launchBlockedByUnsupportedVersion(state: currentState, configuration: context.configuration) else {
                 break
@@ -104,6 +104,18 @@ struct SimulatedGameChannelClient: GameChannelClient {
         }
 
         return nextState
+    }
+
+    private func canPredownload(in state: ChannelClientState) -> Bool {
+        guard state.installState == .installed,
+              descriptor.predownloadAvailable,
+              descriptor.predownloadTargetAvailable,
+              let version = descriptor.predownloadVersion
+        else {
+            return false
+        }
+        return !state.predownloadedAll
+            && SemanticVersion(version) > SemanticVersion(state.currentVersion)
     }
 
     private func stateAfterImport(

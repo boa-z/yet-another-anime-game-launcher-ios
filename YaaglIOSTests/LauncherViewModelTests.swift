@@ -929,20 +929,14 @@ final class LauncherViewModelTests: XCTestCase {
         let defaults = makeDefaults(suiteName: suiteName)
         let nap = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "nap_global" }).applying(
             runtimeMetadata: GameClientRuntimeMetadata(
+                predownloadVersion: "3.1.0",
+                predownloadAvailable: true,
+                predownloadTargetAvailable: true,
                 predownloadArchiveBasenames: [
                     "nap_3.0.0_3.1.0_game.zip",
                     "nap_3.0.0_3.1.0_audio_en-us.zip"
                 ]
             )
-        )
-        let viewModel = LauncherViewModel(
-            defaults: defaults,
-            channelClients: [
-                SimulatedGameChannelClient(
-                    descriptor: nap,
-                    simulationService: LauncherSimulationService(stepDurationMilliseconds: 0)
-                )
-            ]
         )
         let store = ChannelClientStore(defaults: defaults)
         store.save(
@@ -955,6 +949,15 @@ final class LauncherViewModelTests: XCTestCase {
             ),
             for: nap.id
         )
+        let viewModel = LauncherViewModel(
+            defaults: defaults,
+            channelClients: [
+                SimulatedGameChannelClient(
+                    descriptor: nap,
+                    simulationService: LauncherSimulationService(stepDurationMilliseconds: 0)
+                )
+            ]
+        )
 
         await viewModel.predownload()
 
@@ -965,6 +968,72 @@ final class LauncherViewModelTests: XCTestCase {
         XCTAssertEqual(savedState.predownloadedArchiveKeys, expectedKeys)
         XCTAssertTrue(viewModel.taskHistory.contains {
             $0.message.contains("predownload: per-archive marker keys")
+        })
+    }
+
+    @MainActor
+    func testPredownloadWithoutMatchingAria2TargetDoesNotPersistCompletion() async throws {
+        let suiteName = "YaaglIOSTests.\(UUID().uuidString)"
+        let defaults = makeDefaults(suiteName: suiteName)
+        let hkrpg = try XCTUnwrap(GameLibrary.defaultClients.first { $0.id == "hkrpg_global" })
+        let metadata = try GameClientRuntimeMetadataParser.parseHoyoVersionInfo(
+            Data(
+                """
+                {
+                  "main": {
+                    "major": { "version": "4.4.0", "game_pkgs": [] },
+                    "patches": [{ "version": "4.3.5" }]
+                  },
+                  "pre_download": {
+                    "major": { "version": "4.5.0" },
+                    "patches": [{
+                      "version": "4.3.5",
+                      "game_pkgs": [{ "url": "https://example.invalid/pre/game.7z" }],
+                      "audio_pkgs": [{ "language": "en-us", "url": "https://example.invalid/pre/audio.7z" }]
+                    }]
+                  }
+                }
+                """.utf8
+            ),
+            currentVersion: "4.3.4",
+            installedVoiceLanguages: ["en-us"]
+        )
+        let client = hkrpg.applying(runtimeMetadata: metadata)
+        let store = ChannelClientStore(defaults: defaults)
+        store.save(
+            ChannelClientState(
+                installState: .installed,
+                installDirectory: "iOS Sandbox/VirtualGameData/hkrpg_global",
+                currentVersion: "4.3.4",
+                predownloadedAll: false,
+                requiresPatchRevert: false,
+                predownloadedArchiveKeys: ["existing-marker"]
+            ),
+            for: client.id
+        )
+        let viewModel = LauncherViewModel(
+            defaults: defaults,
+            channelClients: [
+                SimulatedGameChannelClient(
+                    descriptor: client,
+                    simulationService: LauncherSimulationService(stepDurationMilliseconds: 0)
+                )
+            ]
+        )
+
+        XCTAssertTrue(client.predownloadAvailable)
+        XCTAssertFalse(client.predownloadTargetAvailable)
+        XCTAssertEqual(client.predownloadArchiveBasenames, [])
+        XCTAssertFalse(viewModel.showPredownloadPrompt)
+
+        await viewModel.predownload()
+
+        let savedState = store.load(for: client.id)
+        XCTAssertFalse(savedState.predownloadedAll)
+        XCTAssertEqual(savedState.predownloadedArchiveKeys, ["existing-marker"])
+        XCTAssertEqual(viewModel.backgroundTaskStatus, .idle)
+        XCTAssertTrue(viewModel.taskHistory.contains {
+            $0.message == "predownload: no target matches current version 4.3.4; desktop would return before download and marker writes"
         })
     }
 

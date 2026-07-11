@@ -6,6 +6,7 @@ struct GameClientRuntimeMetadata: Equatable, Sendable {
     let updatableVersions: [String]?
     let predownloadVersion: String?
     let predownloadAvailable: Bool?
+    let predownloadTargetAvailable: Bool?
     let installSize: String?
     let predownloadArchiveBasenames: [String]?
     let seasunManifestMetadata: VirtualInstallManifestMetadata?
@@ -16,6 +17,7 @@ struct GameClientRuntimeMetadata: Equatable, Sendable {
         updatableVersions: [String]? = nil,
         predownloadVersion: String? = nil,
         predownloadAvailable: Bool? = nil,
+        predownloadTargetAvailable: Bool? = nil,
         installSize: String? = nil,
         installSizeBytes: Int64? = nil,
         predownloadArchiveBasenames: [String]? = nil,
@@ -26,6 +28,7 @@ struct GameClientRuntimeMetadata: Equatable, Sendable {
         self.updatableVersions = updatableVersions
         self.predownloadVersion = predownloadVersion
         self.predownloadAvailable = predownloadAvailable
+        self.predownloadTargetAvailable = predownloadTargetAvailable
         self.installSize = installSize ?? installSizeBytes.map(Self.installSizeString(bytes:))
         self.predownloadArchiveBasenames = predownloadArchiveBasenames
         self.seasunManifestMetadata = seasunManifestMetadata
@@ -79,6 +82,7 @@ enum GameClientRuntimeMetadataParser {
             updatableVersions: try stringArray("updatable_versions", in: root),
             predownloadVersion: predownloadAvailable ? try string("pre_download_version", in: root) : nil,
             predownloadAvailable: predownloadAvailable,
+            predownloadTargetAvailable: predownloadAvailable,
             installSizeBytes: try int64("install_size", in: root)
         )
     }
@@ -96,12 +100,15 @@ enum GameClientRuntimeMetadataParser {
         let predownloadMajor = predownload.flatMap { optionalDictionary("major", in: $0) }
         let predownloadVersion = predownloadMajor.flatMap { optionalString("version", in: $0) }
         let predownloadPatches = predownload.flatMap { array("patches", in: $0) } ?? []
+        let predownloadTargetAvailable = predownloadVersion != nil
+            && containsPatch(for: currentVersion, in: predownloadPatches)
 
         return GameClientRuntimeMetadata(
             latestVersion: try string("version", in: major),
             updatableVersions: versions(from: patches),
             predownloadVersion: predownloadVersion,
             predownloadAvailable: predownloadVersion != nil,
+            predownloadTargetAvailable: predownloadTargetAvailable,
             installSizeBytes: installSizeBytes(from: array("game_pkgs", in: major) ?? []),
             predownloadArchiveBasenames: predownloadArchiveBasenames(
                 from: predownloadPatches,
@@ -128,12 +135,15 @@ enum GameClientRuntimeMetadataParser {
         let predownloadLatest = predownload.flatMap { optionalDictionary("latest", in: $0) }
         let predownloadVersion = predownloadLatest.flatMap { optionalString("version", in: $0) }
         let predownloadDiffs = predownload.flatMap { array("diffs", in: $0) } ?? []
+        let predownloadTargetAvailable = predownloadVersion != nil
+            && containsPatch(for: currentVersion, in: predownloadDiffs)
 
         return GameClientRuntimeMetadata(
             latestVersion: try string("version", in: latest),
             updatableVersions: versions(from: diffs),
             predownloadVersion: predownloadVersion,
             predownloadAvailable: predownloadVersion != nil,
+            predownloadTargetAvailable: predownloadTargetAvailable,
             installSizeBytes: optionalInt64("size", in: latest),
             predownloadArchiveBasenames: predownloadArchiveBasenames(
                 from: predownloadDiffs,
@@ -152,6 +162,7 @@ enum GameClientRuntimeMetadataParser {
         return GameClientRuntimeMetadata(
             latestVersion: try string("projectVersion", in: root),
             predownloadAvailable: false,
+            predownloadTargetAvailable: false,
             installSizeBytes: installSizeBytes(from: paks, sizeKey: "sizeInBytes"),
             seasunManifestMetadata: try seasunManifestMetadata(from: root)
         )
@@ -267,6 +278,16 @@ enum GameClientRuntimeMetadataParser {
 
     private static func versions(from dictionaries: [[String: Any]]) -> [String] {
         dictionaries.compactMap { optionalString("version", in: $0) }
+    }
+
+    private static func containsPatch(
+        for currentVersion: String?,
+        in patches: [[String: Any]]
+    ) -> Bool {
+        guard let currentVersion else {
+            return false
+        }
+        return patches.contains { optionalString("version", in: $0) == currentVersion }
     }
 
     private static func installSizeBytes(

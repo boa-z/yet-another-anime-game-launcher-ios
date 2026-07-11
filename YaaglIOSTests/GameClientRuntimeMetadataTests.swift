@@ -25,6 +25,7 @@ final class GameClientRuntimeMetadataTests: XCTestCase {
         XCTAssertEqual(client.latestVersion, "5.4.0")
         XCTAssertEqual(client.updatableVersions, ["5.2.0", "5.3.0"])
         XCTAssertEqual(client.predownloadVersion, "5.5.0")
+        XCTAssertTrue(client.predownloadTargetAvailable)
         XCTAssertEqual(client.installSize, "12 GiB")
         XCTAssertTrue(channel.updateRequired(in: state))
         XCTAssertTrue(channel.showPredownloadPrompt(in: state))
@@ -88,6 +89,7 @@ final class GameClientRuntimeMetadataTests: XCTestCase {
         XCTAssertEqual(client.latestVersion, "4.4.0")
         XCTAssertEqual(client.updatableVersions, ["4.2.0", "4.3.5"])
         XCTAssertEqual(client.predownloadVersion, "4.5.0")
+        XCTAssertTrue(client.predownloadTargetAvailable)
         XCTAssertEqual(client.installSize, "8 GiB")
         XCTAssertEqual(markerBasenames, [
             "StarRail_4.3.5_4.5.0_hdiff.7z",

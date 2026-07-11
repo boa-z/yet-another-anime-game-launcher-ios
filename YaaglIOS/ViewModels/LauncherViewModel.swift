@@ -152,6 +152,16 @@ final class LauncherViewModel {
     }
 
     func predownload() async {
+        guard selectedChannelClient.showPredownloadPrompt(in: currentState) else {
+            backgroundStatusText = "No matching pre-download target"
+            backgroundProgress = nil
+            backgroundTaskStatus = .idle
+            appendHistory(
+                .predownload,
+                "predownload: no target matches current version \(currentVersion); desktop would return before download and marker writes"
+            )
+            return
+        }
         await runBackground(.predownload)
     }
 
